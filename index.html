@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scouter</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👓</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            padding-top: 80px; /* Account for fixed auth bar */
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #4f46e5;
+            color: white;
+            padding: 24px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-width: 100%;
+        }
+
+        .header-left {
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .auth-bar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .auth-btn {
+            padding: 8px 16px;
+            border: 1px solid rgba(79, 70, 229, 0.3);
+            border-radius: 6px;
+            background: rgba(79, 70, 229, 0.1);
+            color: #4f46e5;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+
+        .auth-btn:hover {
+            background: rgba(79, 70, 229, 0.2);
+            border-color: rgba(79, 70, 229, 0.5);
+        }
+
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        .admin-btn {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: rgba(139, 92, 246, 0.3);
+            color: #8b5cf6;
+            text-decoration: none;
+        }
+
+        .admin-btn:hover {
+            background: rgba(139, 92, 246, 0.2);
+            border-color: rgba(139, 92, 246, 0.5);
+            text-decoration: none;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-details {
+            font-size: 14px;
+            padding: 8px 12px;
+            background: rgba(79, 70, 229, 0.1);
+            border-radius: 6px;
+            border: 1px solid rgba(79, 70, 229, 0.2);
+            color: #4f46e5;
+        }
+
+        .user-name {
+            font-weight: 600;
+        }
+
+        .user-org {
+            opacity: 0.8;
+            font-size: 12px;
+        }
+
+        .content {
+            padding: 24px;
+        }
+
+        .camera-section {
+            margin-bottom: 24px;
+        }
+
+        .camera-preview {
+            width: 100%;
+            height: 300px;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .camera-preview video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        .camera-preview canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        .camera-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        .camera-placeholder {
+            text-align: center;
+            color: #64748b;
+        }
+
+        .camera-placeholder svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 48px;
+        }
+
+        .btn-primary {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            margin-top: 24px;
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .results-header h3 {
+            color: #1f2937;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #475569;
+        }
+
+        .copy-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .json-output {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .success-message {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .success-message.active {
+            display: block;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            max-width: 420px;
+            width: 90%;
+            max-height: 90vh;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #1f2937;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-description {
+            color: #6b7280;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn-loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner-small {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .success-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 20px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+        }
+
+        .success-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .success-text h4 {
+            margin: 0 0 8px 0;
+            color: #166534;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .success-text p {
+            margin: 0 0 16px 0;
+            color: #166534;
+            font-size: 14px;
+        }
+
+        .dev-info {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .dev-info strong {
+            color: #92400e;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .dev-info p {
+            margin: 4px 0 0 0;
+            color: #92400e;
+            font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                border-radius: 12px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+
+            .auth-bar {
+                position: relative;
+                padding: 12px 16px;
+                background: rgba(79, 70, 229, 0.05);
+                border-bottom: 1px solid rgba(79, 70, 229, 0.1);
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 20px;
+            }
+
+            .modal-header {
+                padding: 20px;
+            }
+
+            .modal-body {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Bar -->
+    <div class="auth-bar">
+        <div id="authButtons" class="auth-buttons">
+            <button id="loginBtn" class="auth-btn login-btn">🔐 Login</button>
+            <div id="userInfo" class="user-info" style="display: none;">
+                <div id="userDetails" class="user-details">
+                    <div id="userName" class="user-name"></div>
+                    <div id="userOrg" class="user-org"></div>
+                </div>
+                <a href="/admin/users" id="adminLink" class="auth-btn admin-btn" style="display: none;">👥 Admin</a>
+                <button id="logoutBtn" class="auth-btn logout-btn">🚪 Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>📄 Scouter</h1>
+                    <p>Capture or upload receipts to extract data automatically</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="camera-section">
+                <div class="camera-preview" id="cameraPreview">
+                    <div class="camera-placeholder" id="cameraPlaceholder">
+                        <svg fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
+                        </svg>
+                        <div>
+                            <p><strong>Camera Preview</strong></p>
+                            <p>Click "Start Camera" to begin</p>
+                        </div>
+                    </div>
+                    <video id="cameraVideo" style="display: none;" autoplay playsinline></video>
+                    <canvas id="captureCanvas" style="display: none;"></canvas>
+                    <img id="capturedImage" style="display: none;" alt="Captured receipt">
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-secondary" id="startCameraBtn">
+                        📷 Start Camera
+                    </button>
+                    <button class="btn btn-secondary" id="uploadBtn">
+                        📁 Upload Image
+                    </button>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-primary" id="captureBtn" style="display: none;">
+                        📸 Capture Photo
+                    </button>
+                    <button class="btn btn-success" id="processBtn" style="display: none;">
+                        🔍 Process Receipt
+                    </button>
+                </div>
+                
+                <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment">
+            </div>
+            
+            <div class="loading" id="loadingSection">
+                <div class="spinner"></div>
+                <p>Processing your receipt...</p>
+                <small>This may take a few seconds</small>
+            </div>
+            
+            <div class="error" id="errorSection">
+                <strong>Error:</strong> <span id="errorMessage"></span>
+            </div>
+            
+            <div class="success-message" id="successSection">
+                <strong>Success!</strong> Receipt processed successfully!
+            </div>
+            
+            <div class="results" id="resultsSection">
+                <div class="results-header">
+                    <h3>Extracted Receipt Data</h3>
+                    <button class="copy-btn" id="copyBtn">Copy JSON</button>
+                </div>
+                <div class="json-output" id="jsonOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔐 Login to Scouter</h3>
+                <button id="closeModalBtn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">Enter your email address and we'll send you a magic link to sign in to Scouter.</p>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="emailInput">Email Address</label>
+                        <input type="email" id="emailInput" placeholder="your@email.com" required>
+                    </div>
+                    <button type="submit" id="sendMagicLinkBtn" class="btn btn-primary">
+                        <span class="btn-text">✨ Send Magic Link</span>
+                        <span class="btn-loading" style="display: none;">
+                            <div class="spinner-small"></div>
+                            Sending...
+                        </span>
+                    </button>
+                </form>
+                <div id="magicLinkSent" class="success-message" style="display: none;">
+                    <div class="success-content">
+                        <div class="success-icon">📧</div>
+                        <div class="success-text">
+                            <h4>Magic link sent!</h4>
+                            <p>Check your email and click the link to sign in.</p>
+                            <div class="dev-info">
+                                <strong>Development Mode:</strong>
+                                <p>Check the browser console or terminal for the magic link.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Modal -->
+    <div id="registrationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🎉 Welcome to Scouter!</h3>
+                <button id="closeRegistrationModalBtn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">It looks like this is your first time using Scouter. Please tell us a bit about yourself to get started.</p>
+                <form id="registrationForm">
+                    <div class="form-group">
+                        <label for="userNameInput">Your Name</label>
+                        <input type="text" id="userNameInput" placeholder="John Doe" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="organizationInput">Organization Name</label>
+                        <input type="text" id="organizationInput" placeholder="Acme Corporation" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registrationEmailInput">Email Address</label>
+                        <input type="email" id="registrationEmailInput" readonly style="background-color: #f3f4f6; color: #6b7280;">
+                    </div>
+                    <button type="submit" id="completeRegistrationBtn" class="btn btn-primary">
+                        <span class="btn-text">🚀 Complete Registration</span>
+                        <span class="btn-loading" style="display: none;">
+                            <div class="spinner-small"></div>
+                            Creating account...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Scouter {
+            constructor() {
+                this.currentStream = null;
+                this.capturedImageData = null;
+                this.isAuthenticated = false;
+                this.userEmail = null;
+                this.initializeElements();
+                this.bindEvents();
+                this.initializeAuth();
+            }
+
+            initializeElements() {
+                // Camera elements
+                this.cameraPreview = document.getElementById('cameraPreview');
+                this.cameraPlaceholder = document.getElementById('cameraPlaceholder');
+                this.cameraVideo = document.getElementById('cameraVideo');
+                this.captureCanvas = document.getElementById('captureCanvas');
+                this.capturedImage = document.getElementById('capturedImage');
+                
+                // Buttons
+                this.startCameraBtn = document.getElementById('startCameraBtn');
+                this.uploadBtn = document.getElementById('uploadBtn');
+                this.captureBtn = document.getElementById('captureBtn');
+                this.processBtn = document.getElementById('processBtn');
+                this.copyBtn = document.getElementById('copyBtn');
+                
+                // File input
+                this.fileInput = document.getElementById('fileInput');
+                
+                // Status sections
+                this.loadingSection = document.getElementById('loadingSection');
+                this.errorSection = document.getElementById('errorSection');
+                this.successSection = document.getElementById('successSection');
+                this.resultsSection = document.getElementById('resultsSection');
+                this.jsonOutput = document.getElementById('jsonOutput');
+                this.errorMessage = document.getElementById('errorMessage');
+
+                // Auth elements
+                this.loginBtn = document.getElementById('loginBtn');
+                this.logoutBtn = document.getElementById('logoutBtn');
+                this.userInfo = document.getElementById('userInfo');
+                this.userDetails = document.getElementById('userDetails');
+                this.userName = document.getElementById('userName');
+                this.userOrg = document.getElementById('userOrg');
+                this.adminLink = document.getElementById('adminLink');
+                this.loginModal = document.getElementById('loginModal');
+                this.closeModalBtn = document.getElementById('closeModalBtn');
+                this.loginForm = document.getElementById('loginForm');
+                this.emailInput = document.getElementById('emailInput');
+                this.sendMagicLinkBtn = document.getElementById('sendMagicLinkBtn');
+                this.magicLinkSent = document.getElementById('magicLinkSent');
+                
+                // Registration elements
+                this.registrationModal = document.getElementById('registrationModal');
+                this.closeRegistrationModalBtn = document.getElementById('closeRegistrationModalBtn');
+                this.registrationForm = document.getElementById('registrationForm');
+                this.userNameInput = document.getElementById('userNameInput');
+                this.organizationInput = document.getElementById('organizationInput');
+                this.registrationEmailInput = document.getElementById('registrationEmailInput');
+                this.completeRegistrationBtn = document.getElementById('completeRegistrationBtn');
+            }
+
+            bindEvents() {
+                this.startCameraBtn.addEventListener('click', () => this.startCamera());
+                this.uploadBtn.addEventListener('click', () => this.fileInput.click());
+                this.captureBtn.addEventListener('click', () => this.capturePhoto());
+                this.processBtn.addEventListener('click', () => this.processReceipt());
+                this.copyBtn.addEventListener('click', () => this.copyToClipboard());
+                this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+                // Auth event bindings
+                this.loginBtn.addEventListener('click', () => this.showLoginModal());
+                this.logoutBtn.addEventListener('click', () => this.logout());
+                this.closeModalBtn.addEventListener('click', () => this.hideLoginModal());
+                this.loginModal.addEventListener('click', (e) => {
+                    if (e.target === this.loginModal) this.hideLoginModal();
+                });
+                this.loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+                
+                // Registration event bindings
+                this.closeRegistrationModalBtn.addEventListener('click', () => this.hideRegistrationModal());
+                this.registrationModal.addEventListener('click', (e) => {
+                    if (e.target === this.registrationModal) this.hideRegistrationModal();
+                });
+                this.registrationForm.addEventListener('submit', (e) => this.handleRegistration(e));
+            }
+
+            async startCamera() {
+                try {
+                    this.hideError();
+                    
+                    // Check if camera is supported
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('Camera not supported on this device');
+                    }
+
+                    // Request camera access with back camera preference
+                    const constraints = {
+                        video: {
+                            facingMode: { ideal: 'environment' }, // Back camera
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        }
+                    };
+
+                    this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    // Show video and hide placeholder
+                    this.cameraVideo.srcObject = this.currentStream;
+                    this.cameraVideo.style.display = 'block';
+                    this.cameraPlaceholder.style.display = 'none';
+                    this.capturedImage.style.display = 'none';
+                    
+                    // Update button states
+                    this.startCameraBtn.textContent = '🔄 Switch Camera';
+                    this.captureBtn.style.display = 'block';
+                    this.processBtn.style.display = 'none';
+                    
+                } catch (error) {
+                    console.error('Camera error:', error);
+                    this.showError(`Camera access failed: ${error.message}`);
+                }
+            }
+
+            capturePhoto() {
+                try {
+                    const video = this.cameraVideo;
+                    const canvas = this.captureCanvas;
+                    const context = canvas.getContext('2d');
+                    
+                    // Set canvas dimensions to match video
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // Draw current video frame to canvas
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // Convert to image data
+                    this.capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    // Show captured image
+                    this.capturedImage.src = this.capturedImageData;
+                    this.capturedImage.style.display = 'block';
+                    this.cameraVideo.style.display = 'none';
+                    
+                    // Update button states
+                    this.captureBtn.style.display = 'none';
+                    this.processBtn.style.display = 'block';
+                    
+                    // Stop camera stream
+                    this.stopCamera();
+                    
+                } catch (error) {
+                    console.error('Capture error:', error);
+                    this.showError(`Failed to capture photo: ${error.message}`);
+                }
+            }
+
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    this.showError('Please select an image file');
+                    return;
+                }
+
+                // Validate file size (max 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    this.showError('Image file too large. Please select an image under 10MB');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.capturedImageData = e.target.result;
+                    
+                    // Show uploaded image
+                    this.capturedImage.src = this.capturedImageData;
+                    this.capturedImage.style.display = 'block';
+                    this.cameraVideo.style.display = 'none';
+                    this.cameraPlaceholder.style.display = 'none';
+                    
+                    // Update button states
+                    this.captureBtn.style.display = 'none';
+                    this.processBtn.style.display = 'block';
+                    
+                    this.hideError();
+                };
+                
+                reader.onerror = () => {
+                    this.showError('Failed to read the selected file');
+                };
+                
+                reader.readAsDataURL(file);
+            }
+
+            async processReceipt() {
+                if (!this.isAuthenticated) {
+                    this.showError('Please log in to process receipts');
+                    this.showLoginModal();
+                    return;
+                }
+
+                if (!this.capturedImageData) {
+                    this.showError('No image to process');
+                    return;
+                }
+
+                try {
+                    this.showLoading();
+                    this.hideError();
+                    this.hideResults();
+
+                    // Step 1: Extract text using Google Cloud Vision API (stub)
+                    const extractedText = await this.extractTextFromImage(this.capturedImageData);
+                    
+                    // Step 2: Process text with OpenAI to structure the data (stub)
+                    const structuredData = await this.structureReceiptData(extractedText);
+                    
+                    // Show results
+                    this.hideLoading();
+                    this.showSuccess();
+                    this.showResults(structuredData);
+                    
+                } catch (error) {
+                    console.error('Processing error:', error);
+                    this.hideLoading();
+                    this.showError(`Processing failed: ${error.message}`);
+                }
+            }
+
+            // STUB: Google Cloud Vision API call
+            async extractTextFromImage(imageData) {
+                // Simulate API call delay
+                await this.delay(2000);
+                
+                // This is a stub - in real implementation, you would:
+                // 1. Convert imageData to base64 if needed
+                // 2. Call Google Cloud Vision API
+                // 3. Return the extracted text
+                
+                console.log('🔍 Calling Google Cloud Vision API...');
+                console.log('Image data length:', imageData.length);
+                
+                // Mock extracted text from a receipt
+                return `FRESH MARKET
+123 Main Street
+Vancouver, BC V6B 1A1
+Tel: (604) 555-0123
+
+Date: 2024-01-15
+Time: 14:32:15
+Cashier: John D.
+
+ITEMS:
+Organic Bananas       $3.99
+Whole Milk 1L         $4.49
+Bread - Whole Wheat   $2.99
+Chicken Breast 1kg    $12.99
+Broccoli              $2.49
+Cheddar Cheese        $5.99
+
+Subtotal:            $32.94
+Tax (GST 5%):         $1.65
+Tax (PST 7%):         $2.31
+TOTAL:               $36.90
+
+Payment: Visa ****1234
+Approved: 123456
+
+Thank you for shopping!`;
+            }
+
+            // STUB: OpenAI API call to structure the data
+            async structureReceiptData(extractedText) {
+                // Simulate API call delay
+                await this.delay(1500);
+                
+                console.log('🤖 Calling OpenAI API...');
+                console.log('Extracted text:', extractedText);
+                
+                // This is a stub - in real implementation, you would:
+                // 1. Send extractedText to OpenAI with proper prompt
+                // 2. Parse the response to ensure valid JSON
+                // 3. Return structured data
+                
+                // Mock structured receipt data
+                return {
+                    merchant: {
+                        name: "Fresh Market",
+                        address: "123 Main Street, Vancouver, BC V6B 1A1",
+                        phone: "(604) 555-0123"
+                    },
+                    transaction: {
+                        date: "2024-01-15",
+                        time: "14:32:15",
+                        cashier: "John D.",
+                        payment_method: "Visa ****1234",
+                        approval_code: "123456"
+                    },
+                    items: [
+                        { name: "Organic Bananas", price: 3.99, quantity: 1 },
+                        { name: "Whole Milk 1L", price: 4.49, quantity: 1 },
+                        { name: "Bread - Whole Wheat", price: 2.99, quantity: 1 },
+                        { name: "Chicken Breast 1kg", price: 12.99, quantity: 1 },
+                        { name: "Broccoli", price: 2.49, quantity: 1 },
+                        { name: "Cheddar Cheese", price: 5.99, quantity: 1 }
+                    ],
+                    totals: {
+                        subtotal: 32.94,
+                        gst: 1.65,
+                        pst: 2.31,
+                        total: 36.90
+                    },
+                    currency: "CAD"
+                };
+            }
+
+            stopCamera() {
+                if (this.currentStream) {
+                    this.currentStream.getTracks().forEach(track => track.stop());
+                    this.currentStream = null;
+                }
+            }
+
+            showLoading() {
+                this.loadingSection.classList.add('active');
+            }
+
+            hideLoading() {
+                this.loadingSection.classList.remove('active');
+            }
+
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorSection.classList.add('active');
+            }
+
+            hideError() {
+                this.errorSection.classList.remove('active');
+            }
+
+            showSuccess() {
+                this.successSection.classList.add('active');
+                setTimeout(() => {
+                    this.successSection.classList.remove('active');
+                }, 3000);
+            }
+
+            showResults(data) {
+                this.jsonOutput.textContent = JSON.stringify(data, null, 2);
+                this.resultsSection.classList.add('active');
+            }
+
+            hideResults() {
+                this.resultsSection.classList.remove('active');
+            }
+
+            async copyToClipboard() {
+                try {
+                    await navigator.clipboard.writeText(this.jsonOutput.textContent);
+                    this.copyBtn.textContent = '✓ Copied!';
+                    setTimeout(() => {
+                        this.copyBtn.textContent = 'Copy JSON';
+                    }, 2000);
+                } catch (error) {
+                    console.error('Copy failed:', error);
+                    // Fallback for older browsers
+                    this.selectText(this.jsonOutput);
+                }
+            }
+
+            selectText(element) {
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            // Authentication methods
+            initializeAuth() {
+                // Check for authentication token in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const token = urlParams.get('token');
+                
+                if (token) {
+                    this.verifyToken(token);
+                    // Clean up URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                } else {
+                    // Check for stored authentication
+                    const storedAuth = localStorage.getItem('scouterAuth');
+                    if (storedAuth) {
+                        try {
+                            const authData = JSON.parse(storedAuth);
+                            if (authData.user) {
+                                this.setAuthenticated(authData.user, authData.sessionId);
+                            } else if (authData.email) {
+                                // Legacy format - clear and require re-login
+                                localStorage.removeItem('scouterAuth');
+                            }
+                        } catch (e) {
+                            localStorage.removeItem('scouterAuth');
+                        }
+                    }
+                }
+            }
+
+            async verifyToken(token) {
+                try {
+                    const response = await fetch('/api/auth/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ token })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (data.requires_registration) {
+                            // New user needs to complete registration
+                            this.showRegistrationModal(data.email, data.token);
+                        } else {
+                            // Existing user authentication
+                            this.setAuthenticated(data.user, data.session_id);
+                            this.showSuccess(`Welcome back, ${data.user.name}!`);
+                        }
+                    } else {
+                        const errorData = await response.json();
+                        this.showError(errorData.error || 'Invalid or expired login link');
+                    }
+                } catch (error) {
+                    console.error('Token verification error:', error);
+                    this.showError('Failed to verify login link');
+                }
+            }
+
+            setAuthenticated(user, sessionId = null) {
+                this.isAuthenticated = true;
+                this.currentUser = user;
+                this.userName.textContent = user.name;
+                this.userOrg.textContent = user.organization;
+                this.loginBtn.style.display = 'none';
+                this.userInfo.style.display = 'flex';
+                
+                // Show admin link if user is admin
+                if (user.is_admin) {
+                    this.adminLink.style.display = 'inline-block';
+                } else {
+                    this.adminLink.style.display = 'none';
+                }
+                
+                // Store authentication and session
+                const authData = { user };
+                if (sessionId) {
+                    authData.sessionId = sessionId;
+                    // Store session ID in cookie for admin pages
+                    document.cookie = `session_id=${sessionId}; path=/; max-age=86400`; // 24 hours
+                }
+                localStorage.setItem('scouterAuth', JSON.stringify(authData));
+            }
+
+            showLoginModal() {
+                this.loginModal.style.display = 'flex';
+                this.emailInput.focus();
+            }
+
+            hideLoginModal() {
+                this.loginModal.style.display = 'none';
+                this.resetLoginForm();
+            }
+
+            resetLoginForm() {
+                this.emailInput.value = '';
+                this.magicLinkSent.style.display = 'none';
+                this.loginForm.style.display = 'block';
+                this.sendMagicLinkBtn.disabled = false;
+                document.querySelector('.btn-text').style.display = 'inline';
+                document.querySelector('.btn-loading').style.display = 'none';
+            }
+
+            async handleLogin(e) {
+                e.preventDefault();
+                
+                const email = this.emailInput.value.trim();
+                if (!email) return;
+
+                // Show loading state
+                this.sendMagicLinkBtn.disabled = true;
+                document.querySelector('.btn-text').style.display = 'none';
+                document.querySelector('.btn-loading').style.display = 'flex';
+
+                try {
+                    const response = await fetch('/api/auth/send-magic-link', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Show success message
+                        this.loginForm.style.display = 'none';
+                        this.magicLinkSent.style.display = 'block';
+                        
+                        // Update success message with MailHog info if available
+                        if (data.mailhog_url) {
+                            const devInfo = document.querySelector('.dev-info p');
+                            devInfo.innerHTML = `Check your email or view it in <a href="${data.mailhog_url}" target="_blank" style="color: #92400e; text-decoration: underline;">MailHog</a>.`;
+                        }
+                    } else {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to send magic link');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    this.showError('Failed to send magic link. Please try again.');
+                    this.resetLoginForm();
+                }
+            }
+
+            showRegistrationModal(email, token) {
+                this.registrationEmailInput.value = email;
+                this.registrationModal.dataset.token = token;
+                this.registrationModal.style.display = 'flex';
+                this.userNameInput.focus();
+            }
+
+            hideRegistrationModal() {
+                this.registrationModal.style.display = 'none';
+                this.resetRegistrationForm();
+            }
+
+            resetRegistrationForm() {
+                this.userNameInput.value = '';
+                this.organizationInput.value = '';
+                this.registrationEmailInput.value = '';
+                this.completeRegistrationBtn.disabled = false;
+                document.querySelector('#registrationForm .btn-text').style.display = 'inline';
+                document.querySelector('#registrationForm .btn-loading').style.display = 'none';
+            }
+
+            async handleRegistration(e) {
+                e.preventDefault();
+                
+                const name = this.userNameInput.value.trim();
+                const organization = this.organizationInput.value.trim();
+                const token = this.registrationModal.dataset.token;
+                
+                if (!name || !organization) return;
+
+                // Show loading state
+                this.completeRegistrationBtn.disabled = true;
+                document.querySelector('#registrationForm .btn-text').style.display = 'none';
+                document.querySelector('#registrationForm .btn-loading').style.display = 'flex';
+
+                try {
+                    const response = await fetch('/api/auth/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ 
+                            token,
+                            name,
+                            organization
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.hideRegistrationModal();
+                        this.setAuthenticated(data.user, data.session_id);
+                        this.showSuccess(`Welcome to Scouter, ${data.user.name}!`);
+                    } else {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to complete registration');
+                    }
+                } catch (error) {
+                    console.error('Registration error:', error);
+                    this.showError(error.message);
+                    this.resetRegistrationForm();
+                }
+            }
+
+            logout() {
+                this.isAuthenticated = false;
+                this.currentUser = null;
+                this.loginBtn.style.display = 'inline-block';
+                this.userInfo.style.display = 'none';
+                
+                // Remove stored authentication and session cookie
+                localStorage.removeItem('scouterAuth');
+                document.cookie = 'session_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                
+                this.showSuccess('Successfully logged out!');
+            }
+
+
+
+            // Cleanup when page unloads
+            cleanup() {
+                this.stopCamera();
+            }
+        }
+
+        // Initialize Scouter when page loads
+        let scouter;
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            scouter = new Scouter();
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (scouter) {
+                scouter.cleanup();
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,34 @@
+# Scouter - Standalone Receipt Processing System
+# Complete dependencies for authentication and future API integrations
+
+# Web Framework & Authentication
+Flask==3.0.0
+Flask-CORS==4.0.0
+
+# Security & Cryptography
+cryptography>=41.0.0,<46.0.0
+
+# HTTP Requests (for API integrations)
+requests>=2.31.0
+
+# JSON Web Tokens (if needed for enhanced auth)
+PyJWT>=2.8.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# Date/Time Utilities
+python-dateutil>=2.8.2
+
+# Database
+SQLAlchemy>=2.0.0
+Flask-SQLAlchemy>=3.0.0
+Flask-Migrate>=4.0.0
+
+# Email
+Flask-Mail>=0.9.1
+
+# Future API Integrations (commented out for now)
+# google-cloud-vision>=3.4.5    # For Google Cloud Vision API
+# openai>=1.3.5                 # For OpenAI API integration
+# pillow>=10.1.0                # For image processing 
