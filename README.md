@@ -8,6 +8,7 @@ Scouter is a standalone receipt processing system with magic link authentication
 - 📧 **MailHog Email Testing** - Visual email testing for development  
 - 👥 **Multi-Organization Support** - Users belong to organizations
 - 👑 **Admin Panel** - User management for administrators
+- 👨‍💼 **Manager System** - Organization managers can invite new team members
 - 💾 **Database-Backed** - SQLAlchemy with SQLite (dev) / PostgreSQL (prod)
 - 🔄 **Database Migrations** - Flask-Migrate for schema management
 - 📱 **Mobile-Friendly** - Responsive authentication UI
@@ -149,6 +150,7 @@ python seed_data.py
 | `/api/auth/send-magic-link` | POST | Send magic link to email (works for new and existing users) |
 | `/api/auth/verify` | POST | Verify magic token (returns registration prompt for new users) |
 | `/api/auth/register` | POST | Complete new user registration |
+| `/api/auth/invite` | POST | Invite new team member (manager only) |
 | `/api/auth/status` | GET | Check authentication status |
 | `/api/auth/logout` | POST | Logout user |
 | `/api/health` | GET | Health check (JSON) |

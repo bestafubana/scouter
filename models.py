@@ -52,6 +52,7 @@ class User(db.Model):
     # Authentication fields
     is_active: Mapped[bool] = mapped_column(default=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
+    is_manager: Mapped[bool] = mapped_column(default=False)
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     
     # Timestamps
@@ -71,6 +72,7 @@ class User(db.Model):
             'organization': self.organization.name if self.organization else None,
             'is_active': self.is_active,
             'is_admin': self.is_admin,
+            'is_manager': self.is_manager,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()

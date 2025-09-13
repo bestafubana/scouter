@@ -110,6 +110,17 @@
             text-decoration: none;
         }
 
+        .invite-btn {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #10b981;
+        }
+
+        .invite-btn:hover {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+
         .user-info {
             display: flex;
             align-items: center;
@@ -568,6 +579,7 @@
                     <div id="userOrg" class="user-org"></div>
                 </div>
                 <a href="/admin/users" id="adminLink" class="auth-btn admin-btn" style="display: none;">👥 Admin</a>
+                <button id="inviteBtn" class="auth-btn invite-btn" style="display: none;">✉️ Invite</button>
                 <button id="logoutBtn" class="auth-btn logout-btn">🚪 Logout</button>
             </div>
         </div>
@@ -718,6 +730,40 @@
         </div>
     </div>
 
+    <!-- Invitation Modal -->
+    <div id="invitationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✉️ Invite Team Member</h3>
+                <button id="closeInviteModalBtn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">Invite a new team member to join your organization on Scouter.</p>
+                <form id="invitationForm">
+                    <div class="form-group">
+                        <label for="inviteNameInput">Full Name</label>
+                        <input type="text" id="inviteNameInput" placeholder="Jane Smith" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="inviteEmailInput">Email Address</label>
+                        <input type="email" id="inviteEmailInput" placeholder="jane@company.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="inviteEmailConfirmInput">Confirm Email Address</label>
+                        <input type="email" id="inviteEmailConfirmInput" placeholder="jane@company.com" required>
+                    </div>
+                    <button type="submit" id="sendInviteBtn" class="btn btn-primary">
+                        <span class="btn-text">📧 Send Invitation</span>
+                        <span class="btn-loading" style="display: none;">
+                            <div class="spinner-small"></div>
+                            Sending invitation...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         class Scouter {
             constructor() {
@@ -764,6 +810,7 @@
                 this.userName = document.getElementById('userName');
                 this.userOrg = document.getElementById('userOrg');
                 this.adminLink = document.getElementById('adminLink');
+                this.inviteBtn = document.getElementById('inviteBtn');
                 this.loginModal = document.getElementById('loginModal');
                 this.closeModalBtn = document.getElementById('closeModalBtn');
                 this.loginForm = document.getElementById('loginForm');
@@ -779,6 +826,15 @@
                 this.organizationInput = document.getElementById('organizationInput');
                 this.registrationEmailInput = document.getElementById('registrationEmailInput');
                 this.completeRegistrationBtn = document.getElementById('completeRegistrationBtn');
+                
+                // Invitation elements
+                this.invitationModal = document.getElementById('invitationModal');
+                this.invitationForm = document.getElementById('invitationForm');
+                this.inviteNameInput = document.getElementById('inviteNameInput');
+                this.inviteEmailInput = document.getElementById('inviteEmailInput');
+                this.inviteEmailConfirmInput = document.getElementById('inviteEmailConfirmInput');
+                this.sendInviteBtn = document.getElementById('sendInviteBtn');
+                this.closeInviteModalBtn = document.getElementById('closeInviteModalBtn');
             }
 
             bindEvents() {
@@ -804,6 +860,14 @@
                     if (e.target === this.registrationModal) this.hideRegistrationModal();
                 });
                 this.registrationForm.addEventListener('submit', (e) => this.handleRegistration(e));
+                
+                // Invitation event listeners
+                this.inviteBtn.addEventListener('click', () => this.showInvitationModal());
+                this.closeInviteModalBtn.addEventListener('click', () => this.hideInvitationModal());
+                this.invitationModal.addEventListener('click', (e) => {
+                    if (e.target === this.invitationModal) this.hideInvitationModal();
+                });
+                this.invitationForm.addEventListener('submit', (e) => this.handleInvitation(e));
             }
 
             async startCamera() {
@@ -1151,9 +1215,18 @@ Thank you for shopping!`;
                             // New user needs to complete registration
                             this.showRegistrationModal(data.email, data.token);
                         } else {
-                            // Existing user authentication
+                            // Existing user authentication (including invited users)
                             this.setAuthenticated(data.user, data.session_id);
-                            this.showSuccess(`Welcome back, ${data.user.name}!`);
+                            
+                            // Check if this might be a first-time invited user login
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const hasToken = urlParams.get('token');
+                            
+                            if (hasToken) {
+                                this.showSuccess(`Welcome to Scouter, ${data.user.name}! You've successfully joined ${data.user.organization}.`);
+                            } else {
+                                this.showSuccess(`Welcome back, ${data.user.name}!`);
+                            }
                         }
                     } else {
                         const errorData = await response.json();
@@ -1178,6 +1251,13 @@ Thank you for shopping!`;
                     this.adminLink.style.display = 'inline-block';
                 } else {
                     this.adminLink.style.display = 'none';
+                }
+                
+                // Show invite button if user is manager
+                if (user.is_manager) {
+                    this.inviteBtn.style.display = 'inline-block';
+                } else {
+                    this.inviteBtn.style.display = 'none';
                 }
                 
                 // Store authentication and session
@@ -1326,6 +1406,87 @@ Thank you for shopping!`;
                 document.cookie = 'session_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
                 
                 this.showSuccess('Successfully logged out!');
+            }
+
+            // Invitation Modal Functions
+            showInvitationModal() {
+                this.resetInvitationForm();
+                this.invitationModal.style.display = 'flex';
+                this.inviteNameInput.focus();
+            }
+
+            hideInvitationModal() {
+                this.invitationModal.style.display = 'none';
+                this.resetInvitationForm();
+            }
+
+            resetInvitationForm() {
+                this.inviteNameInput.value = '';
+                this.inviteEmailInput.value = '';
+                this.inviteEmailConfirmInput.value = '';
+                this.sendInviteBtn.disabled = false;
+                this.sendInviteBtn.querySelector('.btn-text').style.display = 'inline';
+                this.sendInviteBtn.querySelector('.btn-loading').style.display = 'none';
+            }
+
+            async handleInvitation(e) {
+                e.preventDefault();
+                
+                const name = this.inviteNameInput.value.trim();
+                const email = this.inviteEmailInput.value.trim();
+                const emailConfirm = this.inviteEmailConfirmInput.value.trim();
+                
+                if (!name || !email || !emailConfirm) {
+                    this.showError('Please fill in all fields');
+                    return;
+                }
+                
+                if (email !== emailConfirm) {
+                    this.showError('Email addresses do not match');
+                    return;
+                }
+                
+                // Show loading state
+                this.sendInviteBtn.disabled = true;
+                this.sendInviteBtn.querySelector('.btn-text').style.display = 'none';
+                this.sendInviteBtn.querySelector('.btn-loading').style.display = 'inline';
+                
+                try {
+                    const authData = JSON.parse(localStorage.getItem('scouterAuth'));
+                    const response = await fetch('/api/auth/invite', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authData.sessionId}`
+                        },
+                        body: JSON.stringify({
+                            name: name,
+                            email: email,
+                            email_confirm: emailConfirm
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.hideInvitationModal();
+                        let message = `Invitation sent to ${name}!`;
+                        if (data.mailhog_url) {
+                            message += ` Check MailHog: ${data.mailhog_url}`;
+                        }
+                        this.showSuccess(message);
+                    } else {
+                        this.showError(data.error || 'Failed to send invitation');
+                    }
+                } catch (error) {
+                    console.error('Invitation error:', error);
+                    this.showError('Failed to send invitation. Please try again.');
+                } finally {
+                    // Reset loading state
+                    this.sendInviteBtn.disabled = false;
+                    this.sendInviteBtn.querySelector('.btn-text').style.display = 'inline';
+                    this.sendInviteBtn.querySelector('.btn-loading').style.display = 'none';
+                }
             }
 
 

@@ -5,6 +5,7 @@ Handles magic link authentication with local dev SMTP simulation.
 """
 
 import json
+import re
 import secrets
 import time
 import os
@@ -97,6 +98,29 @@ def require_admin_page(f):
                 <p>Admin access required. Please <a href="/">login</a> with an admin account.</p>
             </body></html>
             ''', 403
+        
+        # Update last activity
+        user_data['last_activity'] = datetime.now()
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_manager(f):
+    """Decorator to require manager authentication"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check for session ID in Authorization header
+        session_id = request.headers.get('Authorization', '').replace('Bearer ', '')
+        
+        if not session_id:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_data = authenticated_users.get(session_id)
+        if not user_data:
+            return jsonify({'error': 'Invalid session'}), 401
+        
+        if not user_data.get('is_manager', False):
+            return jsonify({'error': 'Manager access required'}), 403
         
         # Update last activity
         user_data['last_activity'] = datetime.now()
@@ -213,6 +237,92 @@ def send_magic_link_email(email: str, magic_link: str, user_name: str):
         print(f"❌ Failed to send email: {e}")
         return False
 
+def send_invitation_email(email: str, invitee_name: str, manager_name: str, organization: str, magic_link: str):
+    """Send invitation email via MailHog"""
+    try:
+        msg = Message(
+            subject=f"You're invited to join {organization} on Scouter! 🎉",
+            recipients=[email],
+            sender=app.config['MAIL_DEFAULT_SENDER']
+        )
+        
+        # HTML email template
+        msg.html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Scouter Invitation</title>
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">👓 Scouter</h1>
+                <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">You're invited!</p>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 8px; margin-bottom: 30px;">
+                <h2 style="color: #333; margin-top: 0;">Hi {invitee_name}! 🎉</h2>
+                <p><strong>{manager_name}</strong> has invited you to join <strong>{organization}</strong> on Scouter!</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{magic_link}" style="background: #10b981; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block; font-size: 16px;">
+                        🚀 Accept Invitation
+                    </a>
+                </div>
+                
+                <p style="font-size: 14px; color: #666;">
+                    Or copy and paste this link into your browser:<br>
+                    <a href="{magic_link}" style="color: #10b981; word-break: break-all;">{magic_link}</a>
+                </p>
+            </div>
+            
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px; color: #856404;">
+                    ⏰ <strong>This invitation will expire in {TOKEN_EXPIRY_MINUTES} minutes</strong> for your security.
+                </p>
+            </div>
+            
+            <div style="text-align: center; font-size: 12px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
+                <p>If you didn't expect this invitation, you can safely ignore it.</p>
+                <p style="margin: 0;">Sent by Scouter • Receipt Processing Made Easy</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Plain text fallback
+        msg.body = f"""
+        Hi {invitee_name}!
+
+        {manager_name} has invited you to join {organization} on Scouter!
+
+        Click the link below to accept the invitation and sign in:
+        {magic_link}
+
+        This invitation will expire in {TOKEN_EXPIRY_MINUTES} minutes.
+
+        If you didn't expect this invitation, you can safely ignore this email.
+
+        --
+        Scouter Team
+        """
+        
+        mail.send(msg)
+        
+        print(f"📧 Invitation email sent to {invitee_name} ({email})")
+        
+        # Show MailHog info if in development
+        mailhog_info = get_mailhog_info()
+        if mailhog_info['enabled']:
+            print(f"🔗 MailHog UI: {mailhog_info['web_ui']}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to send invitation email: {e}")
+        return False
+
 @app.route('/api/auth/send-magic-link', methods=['POST'])
 def send_magic_link():
     """Send a magic link to the user's email"""
@@ -304,6 +414,7 @@ def verify_token():
         else:
             # Existing user flow
             user = User.query.filter_by(email=email).first()
+            print(f"🔍 Token verification for {email}: User found: {user is not None}, Active: {user.is_active if user else 'N/A'}")
             if not user or not user.is_active:
                 return jsonify({'error': 'User not found or inactive'}), 401
             
@@ -322,6 +433,7 @@ def verify_token():
                 'name': user.name,
                 'organization': user.organization.name,
                 'is_admin': user.is_admin,
+                'is_manager': user.is_manager,
                 'authenticated_at': datetime.now(),
                 'last_activity': datetime.now()
             }
@@ -335,7 +447,8 @@ def verify_token():
                     'email': user.email,
                     'name': user.name,
                     'organization': user.organization.name,
-                    'is_admin': user.is_admin
+                    'is_admin': user.is_admin,
+                    'is_manager': user.is_manager
                 },
                 'session_id': session_id,
                 'message': 'Authentication successful'
@@ -405,18 +518,21 @@ def register_user():
         
         # Create or find organization
         organization = Organization.query.filter_by(name=org_name).first()
+        is_new_org = organization is None
         if not organization:
             organization = Organization(name=org_name)
             db.session.add(organization)
             db.session.flush()  # Get the ID without committing
         
-        # Create user (set admin status for specific email)
+        # Create user (set admin status for specific email, manager for first user in org)
         is_admin = email == 'natanaelsilva@gmail.com'
+        is_manager = is_new_org  # First user in organization becomes manager
         user = User(
             email=email,
             name=user_name,
             org_id=organization.id,
-            is_admin=is_admin
+            is_admin=is_admin,
+            is_manager=is_manager
         )
         db.session.add(user)
         db.session.commit()
@@ -448,7 +564,8 @@ def register_user():
                 'email': user.email,
                 'name': user.name,
                 'organization': organization.name,
-                'is_admin': user.is_admin
+                'is_admin': user.is_admin,
+                'is_manager': user.is_manager
             },
             'session_id': session_id,
             'message': 'Registration and authentication successful'
@@ -458,6 +575,95 @@ def register_user():
         print(f"Error during registration: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to complete registration'}), 500
+
+@app.route('/api/auth/invite', methods=['POST'])
+@require_manager
+def invite_user():
+    """Invite a new user to the organization (manager only)"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        email_confirm = data.get('email_confirm', '').strip().lower()
+        invitee_name = data.get('name', '').strip()
+        
+        if not all([email, email_confirm, invitee_name]):
+            return jsonify({'error': 'Email, email confirmation, and name are required'}), 400
+        
+        if email != email_confirm:
+            return jsonify({'error': 'Email addresses do not match'}), 400
+        
+        # Validate email format
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        # Get manager's session info
+        session_id = request.headers.get('Authorization', '').replace('Bearer ', '')
+        manager_data = authenticated_users.get(session_id)
+        
+        # Get manager's user record to find organization
+        manager_user = User.query.get(manager_data['user_id'])
+        if not manager_user:
+            return jsonify({'error': 'Manager user not found'}), 404
+        
+        # Check if user already exists
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            return jsonify({'error': 'User with this email already exists'}), 409
+        
+        # Create the invited user directly (pre-registered)
+        user = User(
+            email=email,
+            name=invitee_name,
+            org_id=manager_user.org_id,
+            is_admin=False,
+            is_manager=False  # Invited users are not managers by default
+        )
+        db.session.add(user)
+        db.session.commit()
+        
+        print(f"✅ Created invited user: {user.name} ({user.email}) - Active: {user.is_active}, ID: {user.id}")
+        
+        # Generate magic token for the invited user
+        token = generate_magic_token(email, is_new_user=False)  # Not new since we pre-created them
+        
+        # Create magic link
+        base_url = request.host_url.rstrip('/')
+        magic_link = f"{base_url}/index.html?token={token}"
+        
+        # Send invitation email
+        try:
+            send_invitation_email(email, invitee_name, manager_user.name, manager_user.organization.name, magic_link)
+            
+            print(f"📧 Invitation sent to {invitee_name} ({email}) by {manager_user.name}")
+            
+            response_data = {
+                'success': True,
+                'message': f'Invitation sent to {invitee_name}',
+                'invitee': {
+                    'email': email,
+                    'name': invitee_name,
+                    'organization': manager_user.organization.name
+                }
+            }
+            
+            # Include MailHog info if in development
+            mailhog_info = get_mailhog_info()
+            if mailhog_info and mailhog_info['enabled']:
+                response_data['mailhog_url'] = mailhog_info['web_ui']
+            
+            return jsonify(response_data)
+            
+        except Exception as email_error:
+            print(f"Failed to send invitation email: {email_error}")
+            # Remove the user if email failed
+            db.session.delete(user)
+            db.session.commit()
+            return jsonify({'error': 'Failed to send invitation email'}), 500
+        
+    except Exception as e:
+        print(f"Error during invitation: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to send invitation'}), 500
 
 @app.route('/api/auth/logout', methods=['POST'])
 def logout():
@@ -766,6 +972,7 @@ def admin_users_page():
                                 <div class="flex items-center">
                                     <div class="text-sm font-medium text-gray-900">{user.name}</div>
                                     {"<span class='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800'>Admin</span>" if user.is_admin else ""}
+                                    {"<span class='ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'>Manager</span>" if user.is_manager else ""}
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
