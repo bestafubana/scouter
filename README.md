@@ -2,6 +2,48 @@
 
 Scouter is a standalone receipt processing system with magic link authentication, database-backed user management, and AI-powered data extraction.
 
+## Table of Contents
+
+- [Scouter - Receipt Processing System](#scouter---receipt-processing-system)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Quick Start](#quick-start)
+    - [1. Setup Environment](#1-setup-environment)
+    - [2. Start MailHog (Email Testing)](#2-start-mailhog-email-testing)
+    - [3. Start Scouter](#3-start-scouter)
+    - [4. Access Scouter](#4-access-scouter)
+    - [5. Login Process](#5-login-process)
+      - [For Existing Users:](#for-existing-users)
+      - [For New Users (First Time):](#for-new-users-first-time)
+  - [Test Users](#test-users)
+    - [Acme Corporation](#acme-corporation)
+    - [Tech Innovations Inc](#tech-innovations-inc)
+    - [Green Energy Solutions](#green-energy-solutions)
+    - [Testing New User Registration](#testing-new-user-registration)
+  - [Development Setup](#development-setup)
+    - [Email Testing with MailHog](#email-testing-with-mailhog)
+    - [Database Management](#database-management)
+  - [API Documentation](#api-documentation)
+  - [API Endpoints](#api-endpoints)
+    - [Authentication Endpoints](#authentication-endpoints)
+    - [Frontend Endpoints](#frontend-endpoints)
+  - [Email Configuration](#email-configuration)
+    - [Development (MailHog)](#development-mailhog)
+    - [Production (Amazon SES)](#production-amazon-ses)
+  - [Database Configuration](#database-configuration)
+    - [Development (SQLite)](#development-sqlite)
+    - [Production (PostgreSQL)](#production-postgresql)
+  - [Security Features](#security-features)
+  - [File Structure](#file-structure)
+  - [Troubleshooting](#troubleshooting)
+    - [Email Issues](#email-issues)
+    - [Database Issues](#database-issues)
+    - [Server Issues](#server-issues)
+    - [Health Check](#health-check)
+  - [Production Deployment](#production-deployment)
+    - [Environment Variables](#environment-variables)
+    - [Deployment Checklist](#deployment-checklist)
+
 ## Features
 
 - 🔐 **Magic Link Authentication** - Passwordless login via email
@@ -124,7 +166,21 @@ MailHog captures all emails sent by the application, allowing you to:
 **Important URLs:**
 - **MailHog Web UI**: http://localhost:8025 (check emails here!)
 - **Scouter App**: http://localhost:5001/
-- **Health Check**: http://localhost:5001/health
+- **Health Check**: http://localhost:5001/health (no login required in dev mode)
+- **API Documentation**: http://localhost:5001/api/docs
+- **Admin Panel**: http://localhost:5001/admin/users (no login required in dev mode)
+
+### Development Mode
+
+Scouter runs in development mode by default (`DEV_MODE = True` in `auth_server.py`). In development mode:
+
+- 🔓 **Admin pages unlocked** - No authentication required for `/health` and `/admin/users`
+- ⚠️ **Development banners** - Yellow warning banners indicate when auth is disabled
+- 📧 **MailHog integration** - Email testing with local SMTP server
+- 🔍 **Debug information** - Additional logging and error details
+
+**Production Deployment:**
+Set `DEV_MODE = False` in `auth_server.py` to enable full authentication requirements.
 
 ### Database Management
 
@@ -140,6 +196,19 @@ rm scouter.db
 flask db upgrade
 python seed_data.py
 ```
+
+## API Documentation
+
+Scouter provides comprehensive API documentation using Redocly. The interactive documentation includes:
+
+- 📚 **Complete API Reference** - All endpoints with detailed descriptions
+- 🔍 **Interactive Examples** - Try API calls directly from the documentation
+- 📝 **Request/Response Schemas** - Detailed data models and examples
+- 🔐 **Authentication Guide** - How to use magic link authentication
+
+**Access the API Documentation:**
+- **Interactive Docs**: http://localhost:5001/api/docs
+- **OpenAPI Spec**: http://localhost:5001/api/openapi.yaml
 
 ## API Endpoints
 

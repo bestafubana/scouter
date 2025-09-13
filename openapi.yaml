@@ -1,0 +1,472 @@
+openapi: 3.0.3
+info:
+  title: Scouter API
+  description: |
+    Scouter is a standalone receipt processing system with magic link authentication, 
+    database-backed user management, and AI-powered data extraction.
+    
+    ## Authentication
+    
+    Most endpoints require authentication via magic link. The authentication flow:
+    1. Send magic link to email via `/api/auth/send-magic-link`
+    2. User clicks link with token parameter
+    3. Verify token via `/api/auth/verify`
+    4. For new users, complete registration via `/api/auth/register`
+    
+    ## Admin Access
+    
+    Some endpoints require admin privileges. Admin users can access:
+    - Health check endpoints
+    - User management pages
+    - System monitoring
+    
+  version: 1.0.0
+  contact:
+    name: Scouter API Support
+    url: https://github.com/your-org/scouter
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5001
+    description: Development server
+  - url: http://localhost:5000
+    description: Alternative development server
+
+paths:
+  /api/auth/send-magic-link:
+    post:
+      summary: Send Magic Link
+      description: |
+        Send a magic link to the provided email address. Works for both new and existing users.
+        - For existing users: sends login link
+        - For new users: sends registration link
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                  description: Email address to send magic link to
+      responses:
+        '200':
+          description: Magic link sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Magic link sent to user@example.com"
+                  mailhog_url:
+                    type: string
+                    example: "http://localhost:8025"
+                    description: MailHog URL for development (only in dev mode)
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/verify:
+    post:
+      summary: Verify Magic Token
+      description: |
+        Verify a magic token from email link. Returns different responses based on user status:
+        - Existing users: authentication success with user data
+        - New users: registration prompt with token for completion
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  example: "abc123def456"
+                  description: Magic token from email link
+      responses:
+        '200':
+          description: Token verified successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthSuccess'
+                  - $ref: '#/components/schemas/RegistrationRequired'
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/register:
+    post:
+      summary: Complete User Registration
+      description: Complete registration for new users after token verification
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - name
+                - organization
+              properties:
+                token:
+                  type: string
+                  example: "abc123def456"
+                  description: Registration token from verify endpoint
+                name:
+                  type: string
+                  example: "John Doe"
+                  description: User's full name
+                organization:
+                  type: string
+                  example: "Acme Corporation"
+                  description: Organization name
+      responses:
+        '200':
+          description: Registration completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccess'
+        '400':
+          description: Invalid request or token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/invite:
+    post:
+      summary: Invite Team Member
+      description: Invite a new team member to join the organization (manager only)
+      tags:
+        - Authentication
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - email_confirm
+              properties:
+                name:
+                  type: string
+                  example: "Jane Smith"
+                  description: Full name of the person to invite
+                email:
+                  type: string
+                  format: email
+                  example: "jane@company.com"
+                  description: Email address of the person to invite
+                email_confirm:
+                  type: string
+                  format: email
+                  example: "jane@company.com"
+                  description: Email confirmation (must match email)
+      responses:
+        '200':
+          description: Invitation sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Invitation sent to Jane Smith"
+                  mailhog_url:
+                    type: string
+                    example: "http://localhost:8025"
+                    description: MailHog URL for development
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized - not logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - not a manager
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/status:
+    get:
+      summary: Check Authentication Status
+      description: Check if user is currently authenticated
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Authentication status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+                    example: true
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /api/auth/logout:
+    post:
+      summary: Logout User
+      description: Logout the current user and invalidate session
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+
+  /api/health:
+    get:
+      summary: Health Check API
+      description: Get system health status (admin only)
+      tags:
+        - System
+      security:
+        - AdminAuth: []
+      responses:
+        '200':
+          description: System health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-15T14:32:15.123456"
+                  dev_mode:
+                    type: boolean
+                    example: true
+                  authenticated_users:
+                    type: integer
+                    example: 5
+                    description: Number of currently authenticated users
+        '401':
+          description: Unauthorized - not logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /:
+    get:
+      summary: Main Application
+      description: Redirect to the main Scouter application interface
+      tags:
+        - Frontend
+      responses:
+        '302':
+          description: Redirect to index.html
+
+  /index.html:
+    get:
+      summary: Scouter Application Interface
+      description: Main Scouter application with receipt processing functionality
+      tags:
+        - Frontend
+      responses:
+        '200':
+          description: HTML application interface
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /health:
+    get:
+      summary: Health Check Dashboard
+      description: HTML dashboard showing system health and status (admin only)
+      tags:
+        - Frontend
+      security:
+        - AdminPageAuth: []
+      responses:
+        '200':
+          description: Health check dashboard
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized - not logged in
+        '403':
+          description: Forbidden - not an admin
+
+  /admin/users:
+    get:
+      summary: Admin Users Management
+      description: Admin interface for managing users and organizations
+      tags:
+        - Frontend
+      security:
+        - AdminPageAuth: []
+      responses:
+        '200':
+          description: Users management interface
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized - not logged in
+        '403':
+          description: Forbidden - not an admin
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Session ID from authentication
+    AdminAuth:
+      type: http
+      scheme: bearer
+      description: Admin session for API endpoints
+    AdminPageAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+      description: Admin session cookie for HTML pages
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john.doe@acme.com"
+        organization:
+          type: string
+          example: "Acme Corporation"
+        is_admin:
+          type: boolean
+          example: false
+          description: Whether user has admin privileges
+        is_manager:
+          type: boolean
+          example: false
+          description: Whether user can invite team members
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:32:15.123456"
+
+    AuthSuccess:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Authentication successful"
+        user:
+          $ref: '#/components/schemas/User'
+        session_id:
+          type: string
+          example: "sess_abc123def456"
+          description: Session ID for authenticated requests
+
+    RegistrationRequired:
+      type: object
+      properties:
+        requires_registration:
+          type: boolean
+          example: true
+        email:
+          type: string
+          format: email
+          example: "newuser@example.com"
+        token:
+          type: string
+          example: "reg_abc123def456"
+          description: Registration token for completing signup
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid email address"
+        details:
+          type: string
+          example: "The provided email address is not valid"
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: System
+    description: System health and monitoring
+  - name: Frontend
+    description: HTML pages and application interface

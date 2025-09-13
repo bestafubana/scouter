@@ -52,6 +52,10 @@ def require_admin(f):
     """Decorator to require admin authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Skip authentication in development mode
+        if DEV_MODE:
+            return f(*args, **kwargs)
+        
         # Check for session ID in Authorization header
         session_id = request.headers.get('Authorization', '').replace('Bearer ', '')
         
@@ -75,6 +79,10 @@ def require_admin_page(f):
     """Decorator to require admin authentication for HTML pages"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Skip authentication in development mode
+        if DEV_MODE:
+            return f(*args, **kwargs)
+        
         # For HTML pages, check session from cookie or redirect to login
         session_id = request.cookies.get('session_id') or request.headers.get('Authorization', '').replace('Bearer ', '')
         
@@ -687,6 +695,35 @@ def serve_index():
     """Serve the Scouter HTML file"""
     return send_from_directory('.', 'index.html')
 
+@app.route('/api/docs')
+def api_docs():
+    """API Documentation using Redocly"""
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+    <title>Scouter API Documentation</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👓</text></svg>">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+        }}
+    </style>
+</head>
+<body>
+    <redoc spec-url='/api/openapi.yaml'></redoc>
+    <script src="https://cdn.jsdelivr.net/npm/redoc@2.1.3/bundles/redoc.standalone.js"></script>
+</body>
+</html>'''
+
+@app.route('/api/openapi.yaml')
+def serve_openapi_spec():
+    """Serve OpenAPI specification"""
+    return send_from_directory('.', 'openapi.yaml', mimetype='application/x-yaml')
+
 @app.route('/api/health')
 @require_admin
 def health_check_api():
@@ -730,6 +767,13 @@ def health_check_page():
             <div class="text-center mb-8">
                 <h1 class="text-4xl font-bold text-gray-800 mb-2">🏥 Scouter Health Check</h1>
                 <p class="text-gray-600">System status and monitoring dashboard</p>
+                {"<!-- Development Mode Banner -->" if health_data["dev_mode"] else ""}
+                {"<div class='bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded-lg mt-4 mx-auto max-w-md'>" if health_data["dev_mode"] else ""}
+                {"<div class='flex items-center justify-center'>" if health_data["dev_mode"] else ""}
+                {"<svg class='w-5 h-5 mr-2' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z' clip-rule='evenodd'></path></svg>" if health_data["dev_mode"] else ""}
+                {"<span class='font-medium'>Development Mode - Admin authentication disabled</span>" if health_data["dev_mode"] else ""}
+                {"</div>" if health_data["dev_mode"] else ""}
+                {"</div>" if health_data["dev_mode"] else ""}
             </div>
 
             <!-- Status Cards -->
@@ -847,6 +891,18 @@ def health_check_page():
                         </svg>
                         API Endpoint
                     </a>
+                    <a href="/api/docs" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 inline-flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        API Documentation
+                    </a>
+                    <a href="/admin/users" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 inline-flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"></path>
+                        </svg>
+                        Admin Panel
+                    </a>
                 </div>
             </div>
 
@@ -898,6 +954,13 @@ def admin_users_page():
                     </a>
                 </div>
             </div>
+            {"<!-- Development Mode Banner -->" if DEV_MODE else ""}
+            {"<div class='bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded-lg mt-4'>" if DEV_MODE else ""}
+            {"<div class='flex items-center'>" if DEV_MODE else ""}
+            {"<svg class='w-5 h-5 mr-2' fill='currentColor' viewBox='0 0 20 20'><path fill-rule='evenodd' d='M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z' clip-rule='evenodd'></path></svg>" if DEV_MODE else ""}
+            {"<span class='font-medium'>Development Mode - Admin authentication disabled</span>" if DEV_MODE else ""}
+            {"</div>" if DEV_MODE else ""}
+            {"</div>" if DEV_MODE else ""}
         </div>
 
         <!-- Stats Cards -->

@@ -1,0 +1,37 @@
+apis:
+  scouter@v1:
+    root: openapi.yaml
+
+lint:
+  extends:
+    - recommended
+  rules:
+    no-unresolved-refs: error
+    no-unused-components: warn
+    operation-description: warn
+    operation-operationId-unique: error
+    operation-parameters-unique: error
+    operation-tag-defined: error
+    path-declaration-must-exist: error
+    path-not-include-query: error
+    path-parameters-defined: error
+    tag-description: off
+    info-contact: off
+    info-license: off
+
+theme:
+  openapi:
+    theme:
+      colors:
+        primary:
+          main: '#4f46e5'
+        success:
+          main: '#10b981'
+        warning:
+          main: '#f59e0b'
+        error:
+          main: '#ef4444'
+    logo:
+      url: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">👓</text></svg>'
+      altText: 'Scouter Logo'
+    favicon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">👓</text></svg>'
