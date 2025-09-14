@@ -28,7 +28,11 @@ Flask-Migrate>=4.0.0
 # Email
 Flask-Mail>=0.9.1
 
-# Future API Integrations (commented out for now)
-# google-cloud-vision>=3.4.5    # For Google Cloud Vision API
-# openai>=1.3.5                 # For OpenAI API integration
-# pillow>=10.1.0                # For image processing 
+# Receipt Processing Dependencies
+boto3>=1.34.0                  # For S3 upload
+google-cloud-documentai>=2.20.1  # For Google Document AI processing
+Pillow>=10.1.0                # For image processing
+openai>=1.3.5                 # For OpenAI API integration
+
+# Future API Integrations (for later)
+# google-cloud-vision>=3.4.5    # For Google Cloud Vision API (future iteration) 

@@ -19,9 +19,12 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_mail import Mail, Message
-from models import db, Organization, User
+from models import db, Organization, User, Receipt, ReceiptStatus, ReceiptSource
 from email_config import get_email_config, get_mailhog_info, validate_email_config, print_email_config
 from functools import wraps
+import asyncio
+import threading
+from receipt_processor import ReceiptProcessor
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for development
@@ -47,6 +50,12 @@ authenticated_users: Dict[str, dict] = {}
 # Configuration
 TOKEN_EXPIRY_MINUTES = 15
 DEV_MODE = True  # Set to False in production
+
+# Initialize receipt processor
+receipt_processor = ReceiptProcessor()
+
+# Store for active processing sessions
+active_processing_sessions: Dict[str, dict] = {}
 
 def require_admin(f):
     """Decorator to require admin authentication"""
@@ -1069,6 +1078,115 @@ def root():
     """Root endpoint - redirect to Scouter"""
     from flask import redirect, url_for
     return redirect(url_for('serve_index'))
+
+# Receipt Processing Endpoints
+
+@app.route('/api/receipt/process', methods=['POST'])
+def process_receipt():
+    """Start receipt processing with real-time progress updates"""
+    try:
+        data = request.get_json()
+        image_data = data.get('image_data')
+        
+        if not image_data:
+            return jsonify({'error': 'No image data provided'}), 400
+        
+        # Generate processing session ID
+        session_id = secrets.token_urlsafe(16)
+        
+        # Initialize session
+        active_processing_sessions[session_id] = {
+            'status': 'started',
+            'started_at': datetime.now().isoformat(),
+            'progress': [],
+            'result': None
+        }
+        
+        # Start processing in background thread
+        def run_processing():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            async def progress_callback(update):
+                # Store progress update
+                active_processing_sessions[session_id]['progress'].append({
+                    **update,
+                    'timestamp': datetime.now().isoformat()
+                })
+            
+            try:
+                result = loop.run_until_complete(
+                    receipt_processor.process_receipt(image_data, progress_callback)
+                )
+                
+                # Store final result
+                active_processing_sessions[session_id]['result'] = result
+                active_processing_sessions[session_id]['status'] = 'completed'
+                
+            except Exception as e:
+                active_processing_sessions[session_id]['status'] = 'error'
+                active_processing_sessions[session_id]['error'] = str(e)
+            finally:
+                loop.close()
+        
+        # Start processing thread
+        processing_thread = threading.Thread(target=run_processing)
+        processing_thread.daemon = True
+        processing_thread.start()
+        
+        return jsonify({
+            'session_id': session_id,
+            'status': 'processing_started',
+            'message': 'Receipt processing started. Use the session_id to check progress.'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to start processing: {str(e)}'}), 500
+
+@app.route('/api/receipt/progress/<session_id>', methods=['GET'])
+def get_processing_progress(session_id):
+    """Get real-time progress updates for a processing session"""
+    session = active_processing_sessions.get(session_id)
+    
+    if not session:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    response_data = {
+        'session_id': session_id,
+        'status': session['status'],
+        'started_at': session['started_at'],
+        'progress_updates': session['progress']
+    }
+    
+    # Include result if completed
+    if session['status'] == 'completed' and session.get('result'):
+        response_data['result'] = session['result']
+    
+    # Include error if failed
+    if session['status'] == 'error' and session.get('error'):
+        response_data['error'] = session['error']
+    
+    return jsonify(response_data)
+
+@app.route('/api/receipt/sessions', methods=['GET'])
+def list_processing_sessions():
+    """List all active processing sessions (for debugging)"""
+    if not DEV_MODE:
+        return jsonify({'error': 'Only available in development mode'}), 403
+    
+    sessions_summary = {}
+    for session_id, session_data in active_processing_sessions.items():
+        sessions_summary[session_id] = {
+            'status': session_data['status'],
+            'started_at': session_data['started_at'],
+            'progress_count': len(session_data['progress']),
+            'has_result': session_data.get('result') is not None
+        }
+    
+    return jsonify({
+        'active_sessions': sessions_summary,
+        'total_sessions': len(active_processing_sessions)
+    })
 
 if __name__ == '__main__':
     # Validate email configuration

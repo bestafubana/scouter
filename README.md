@@ -9,10 +9,11 @@ Scouter is a standalone receipt processing system with magic link authentication
   - [Features](#features)
   - [Quick Start](#quick-start)
     - [1. Setup Environment](#1-setup-environment)
-    - [2. Start MailHog (Email Testing)](#2-start-mailhog-email-testing)
-    - [3. Start Scouter](#3-start-scouter)
-    - [4. Access Scouter](#4-access-scouter)
-    - [5. Login Process](#5-login-process)
+    - [2. Setup Google Cloud (Optional)](#2-setup-google-cloud-optional)
+    - [3. Start MailHog (Email Testing)](#3-start-mailhog-email-testing)
+    - [4. Start Scouter](#4-start-scouter)
+    - [5. Access Scouter](#5-access-scouter)
+    - [6. Login Process](#6-login-process)
       - [For Existing Users:](#for-existing-users)
       - [For New Users (First Time):](#for-new-users-first-time)
   - [Test Users](#test-users)
@@ -23,6 +24,12 @@ Scouter is a standalone receipt processing system with magic link authentication
   - [Development Setup](#development-setup)
     - [Email Testing with MailHog](#email-testing-with-mailhog)
     - [Database Management](#database-management)
+  - [Receipt Processing Pipeline](#receipt-processing-pipeline)
+    - [🔄 Processing Flow](#-processing-flow)
+    - [📊 Real-time Progress](#-real-time-progress)
+    - [🎯 Key Features](#-key-features)
+    - [📋 Receipt Record Lifecycle](#-receipt-record-lifecycle)
+    - [🔧 Configuration](#-configuration)
   - [API Documentation](#api-documentation)
   - [API Endpoints](#api-endpoints)
     - [Authentication Endpoints](#authentication-endpoints)
@@ -40,7 +47,9 @@ Scouter is a standalone receipt processing system with magic link authentication
     - [Database Issues](#database-issues)
     - [Server Issues](#server-issues)
     - [Health Check](#health-check)
+    - [Google Document AI Issues](#google-document-ai-issues)
   - [Production Deployment](#production-deployment)
+    - [AWS Deployment (Recommended)](#aws-deployment-recommended)
     - [Environment Variables](#environment-variables)
     - [Deployment Checklist](#deployment-checklist)
 
@@ -55,6 +64,11 @@ Scouter is a standalone receipt processing system with magic link authentication
 - 🔄 **Database Migrations** - Flask-Migrate for schema management
 - 📱 **Mobile-Friendly** - Responsive authentication UI
 - 🏥 **Health Monitoring** - Beautiful health check dashboard (admin only)
+- 📄 **Enhanced Receipt Processing** - Real-time processing pipeline with visual progress
+- ☁️ **S3 Integration** - Secure cloud storage for receipt images
+- 🔍 **Tesseract OCR** - Advanced text extraction from receipt images
+- 🤖 **OpenAI Integration** - AI-powered data structuring with confidence scoring
+- 📊 **Real-time Progress** - Live updates with Alpine.js-powered flow visualization
 
 ## Quick Start
 
@@ -68,6 +82,10 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
+# Configure environment (copy template and edit with your API keys)
+cp env_template.txt .env
+# Edit .env with your AWS S3 and OpenAI API keys (optional for development)
+
 # Initialize database
 export FLASK_APP=auth_server.py
 flask db init
@@ -78,7 +96,63 @@ flask db upgrade
 python seed_data.py
 ```
 
-### 2. Start MailHog (Email Testing)
+### 2. Setup Google Cloud (Optional)
+
+For real Document AI processing (otherwise uses mock mode):
+
+#### **Step-by-Step Google Cloud Setup:**
+
+1. **Create Google Cloud Project**
+   ```bash
+   # Go to https://console.cloud.google.com/
+   # Create new project or select existing one
+   ```
+
+2. **Enable Document AI API**
+   ```bash
+   # In Google Cloud Console:
+   # APIs & Services → Library → Search "Document AI API" → Enable
+   ```
+
+3. **Create Document AI Processor**
+   ```bash
+   # Document AI → Processors → Create Processor
+   # Choose "Invoice Parser" or "Form Parser" for receipts
+   # Note the Processor ID (long string like "abc123def456...")
+   ```
+
+4. **Create Service Account & Download Credentials**
+   ```bash
+   # IAM & Admin → Service Accounts → Create Service Account
+   # Grant role: "Document AI API User"
+   # Create Key → JSON → Download the .json file
+   ```
+
+5. **Update Environment Configuration**
+   ```bash
+   # Add to .env file:
+   GOOGLE_CLOUD_PROJECT_ID=your-project-id
+   GOOGLE_DOCUMENT_AI_PROCESSOR_ID=your-processor-id
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+   ```
+
+6. **Test Your Setup**
+   ```bash
+   # Run the authentication test script
+   python test_google_auth.py
+   ```
+   This script will verify all your credentials and configuration.
+
+#### **Authentication Methods:**
+
+- **Local Development**: Service Account JSON key file
+- **AWS Production**: Service Account JSON key file (secure storage)
+- **GCP Production**: Workload Identity, Instance Service Account
+- **Local Testing Alternative**: `gcloud auth application-default login`
+
+See [Google Document AI Setup Guide](https://cloud.google.com/document-ai/docs/setup) for detailed instructions.
+
+### 3. Start MailHog (Email Testing)
 
 ```bash
 # Install MailHog (macOS)
@@ -92,7 +166,7 @@ mailhog &
 - **Email Inbox**: http://localhost:8025 (view sent emails)
 - **SMTP Server**: localhost:1025 (for sending emails)
 
-### 3. Start Scouter
+### 4. Start Scouter
 
 ```bash
 ./start.sh
@@ -100,14 +174,14 @@ mailhog &
 
 The server will start on `http://localhost:5001` (or `http://localhost:5000` if 5001 is busy)
 
-### 4. Access Scouter
+### 5. Access Scouter
 
 Open your browser and go to:
 ```
 http://localhost:5001/
 ```
 
-### 5. Login Process
+### 6. Login Process
 
 #### For Existing Users:
 1. Click the **🔐 Login** button in the top-right corner
@@ -197,6 +271,178 @@ flask db upgrade
 python seed_data.py
 ```
 
+## Receipt Processing Pipeline
+
+Scouter features an advanced receipt processing system with real-time progress tracking:
+
+### 🔄 Processing Flow
+
+```mermaid
+sequenceDiagram
+  User->>Backend: Upload receipt
+  Backend->>DB: Create empty receipt
+  Backend->>S3: Upload file
+  Backend->>Queue: OCR task (Google Doc AI)
+  Note right of Queue: (optional: convert HEIC to JPG)
+  Queue->>Google: OCR & structure (Doc AI)
+  Google-->>Queue: JSON output
+  Queue->>GPT: Send OCR to GPT with schema
+  GPT-->>Queue: Extracted fields + confidence
+  Queue->>DB: Update receipt fields + ai_review_json
+```
+
+#### Processing Steps:
+
+1. **📤 S3 Upload** - Securely upload receipt images to AWS S3
+2. **🔍 Google Document AI** - Extract text and structured data using Google's advanced OCR
+3. **🤖 GPT Enhancement** - Enhance and validate data using OpenAI GPT-4 with confidence scoring
+4. **✅ Data Validation** - Validate and score the extracted information
+
+### 📊 Real-time Progress
+
+- **Visual Flow Diagram** - See each step's progress with animated indicators
+- **Live Updates** - Real-time status updates via polling
+- **Progress Bars** - Individual step and overall completion tracking
+- **Error Handling** - Clear error messages and retry capabilities
+
+### 🎯 Key Features
+
+- **Confidence Scoring** - AI provides confidence ratings for extracted data
+- **Mock Mode** - Full development mode with simulated processing
+- **Async Processing** - Non-blocking background processing
+- **Session Management** - Track multiple processing sessions
+
+### 📋 Receipt Record Lifecycle
+
+Each receipt goes through the following states in the database:
+
+#### 1. **Create Receipt Record** (Before Upload)
+- Create new row in `receipts` table
+- Set `user_id` to current user
+- Set `status = "uploaded"`
+- Set `source = "upload"` (or "email", etc.)
+- Set `created_at = now()`
+
+#### 2. **Upload Image to S3**
+- Upload image file (JPG, PNG, or converted from HEIC)
+- Update receipt record:
+  - `s3_url = "<S3 file URL>"`
+  - `filename = "<original filename>"`
+
+#### 3. **Run OCR** (Google Document AI)
+- Download or access the image
+- Send to Google Document AI for OCR
+- Parse and store:
+  - `ocr_raw_text = "<full OCR output>"`
+  - `status = "ocr_done"`
+
+#### 4. **Extract Structured Fields** (via GPT)
+- Use OCR text as input and ask GPT to extract:
+  - `receipt_date`, `amount_total`, `vendor_name`, etc.
+- Store the result:
+  - `ai_review_json = "<full structured JSON output from GPT>"`
+  - `ai_confidence_score = <float>` (e.g. 0.91)
+  - `ai_reviewed_at = now()`
+  - `status = "ai_done"`
+
+#### 5. **Update Key Fields from AI Output**
+- Extract values from `ai_review_json` into individual columns:
+  - `receipt_date`, `amount_total`, `vendor_name`, `category`, etc.
+- Optionally flag that these fields are not yet user-verified
+
+#### 6. **Finalize / Ready for Review**
+- If confidence score is high enough:
+  - `status = "awaiting_user_review"`
+- Else, flag for manual review:
+  - `status = "ai_low_confidence"`
+- If user confirms the data:
+  - `is_verified = true`
+  - `status = "verified"`
+
+#### Status Values:
+- `uploaded` - Initial state after file upload
+- `ocr_done` - Google Document AI processing complete
+- `ai_done` - GPT enhancement complete
+- `ai_low_confidence` - Needs manual review due to low confidence
+- `awaiting_user_review` - Ready for user verification
+- `verified` - User has confirmed the data
+
+### 🔧 Configuration
+
+A comprehensive `.env` file has been created for development with all necessary settings:
+
+```bash
+# Copy the template and update with your values
+cp env_template.txt .env
+# Edit .env with your actual API keys
+```
+
+**Key Configuration Sections:**
+
+#### 🔑 **AWS S3 Configuration**
+```bash
+AWS_ACCESS_KEY_ID=your_aws_access_key_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
+S3_BUCKET_NAME=scouter-receipts-dev
+AWS_DEFAULT_REGION=us-east-1
+```
+
+#### 🤖 **OpenAI Configuration**
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4
+OPENAI_MAX_TOKENS=1500
+```
+
+#### 🔍 **Google Document AI Configuration**
+```bash
+# Required: Your Google Cloud Project ID
+GOOGLE_CLOUD_PROJECT_ID=your_google_cloud_project_id
+
+# Required: Your Document AI Processor ID (long string from GCP Console)
+GOOGLE_DOCUMENT_AI_PROCESSOR_ID=abc123def456ghi789...
+
+# Optional: Location (default: us)
+GOOGLE_CLOUD_LOCATION=us
+
+# Authentication Options (choose one):
+
+# Option 1: Local Development - Direct file path
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+
+# Option 2: AWS Production - Secrets Manager (Recommended)
+AWS_SECRETS_MANAGER_SECRET_NAME=scouter/google-document-ai-key
+
+# Option 3: Simple Base64 (Less secure)
+# GOOGLE_SERVICE_ACCOUNT_JSON_B64=base64_encoded_json_here
+```
+
+**Authentication Options:**
+1. **Service Account Key** (Recommended for development):
+   - Download JSON key from Google Cloud Console
+   - Set `GOOGLE_APPLICATION_CREDENTIALS` to file path
+   
+2. **Application Default Credentials** (Alternative for development):
+   ```bash
+   # Run once to authenticate
+   gcloud auth application-default login
+   # No GOOGLE_APPLICATION_CREDENTIALS needed
+   ```
+   
+3. **Production Authentication**:
+   - **AWS Deployment**: Service Account JSON key (stored securely)
+   - **GCP Instances**: Use Instance Service Account
+   - **GKE**: Use Workload Identity
+
+#### ⚙️ **Processing Settings**
+```bash
+MAX_RECEIPT_SIZE=10485760  # 10MB
+PROCESSING_TIMEOUT=60      # 60 seconds
+DEBUG_PROCESSING_SESSIONS=True
+```
+
+**Note**: Without API keys, the system runs in mock mode with simulated processing. The `.env` file includes comprehensive development settings for all components.
+
 ## API Documentation
 
 Scouter provides comprehensive API documentation using Redocly. The interactive documentation includes:
@@ -205,6 +451,7 @@ Scouter provides comprehensive API documentation using Redocly. The interactive 
 - 🔍 **Interactive Examples** - Try API calls directly from the documentation
 - 📝 **Request/Response Schemas** - Detailed data models and examples
 - 🔐 **Authentication Guide** - How to use magic link authentication
+- 📄 **Receipt Processing** - New endpoints for receipt processing pipeline
 
 **Access the API Documentation:**
 - **Interactive Docs**: http://localhost:5001/api/docs
@@ -223,6 +470,14 @@ Scouter provides comprehensive API documentation using Redocly. The interactive 
 | `/api/auth/status` | GET | Check authentication status |
 | `/api/auth/logout` | POST | Logout user |
 | `/api/health` | GET | Health check (JSON) |
+
+### Receipt Processing Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/receipt/process` | POST | Start receipt processing with real-time progress |
+| `/api/receipt/progress/<session_id>` | GET | Get processing progress for a session |
+| `/api/receipt/sessions` | GET | List active processing sessions (dev mode only) |
 
 ### Frontend Endpoints
 
@@ -359,7 +614,76 @@ curl http://localhost:5001/api/health
 
 Or visit the beautiful dashboard: http://localhost:5001/health
 
+### Google Document AI Issues
+
+**Authentication errors:**
+```bash
+# Check if credentials file exists and is readable
+ls -la /path/to/service-account-key.json
+
+# Test authentication
+gcloud auth application-default print-access-token
+
+# Alternative: Use gcloud auth for development
+gcloud auth application-default login
+```
+
+**Common error messages:**
+- `Failed to initialize Google Document AI` - Check credentials path
+- `missing: GOOGLE_CLOUD_PROJECT_ID` - Set project ID in .env
+- `missing: GOOGLE_DOCUMENT_AI_PROCESSOR_ID` - Set processor ID in .env
+- `Permission denied` - Service account needs "Document AI API User" role
+
 ## Production Deployment
+
+### AWS Deployment (Recommended)
+
+#### 🔐 **Google Cloud Credentials on AWS**
+
+Since you're using Google Document AI from AWS, you'll need to securely store the service account key:
+
+**Option 1: AWS Secrets Manager (Recommended)**
+```bash
+# Store the JSON key in AWS Secrets Manager
+aws secretsmanager create-secret \
+  --name "scouter/google-document-ai-key" \
+  --description "Google Document AI Service Account Key" \
+  --secret-string file://path/to/service-account-key.json
+
+# In your application, retrieve the secret
+# The app will write it to a temporary file and set GOOGLE_APPLICATION_CREDENTIALS
+```
+
+**Option 2: AWS Systems Manager Parameter Store**
+```bash
+# Store as SecureString parameter
+aws ssm put-parameter \
+  --name "/scouter/google-document-ai-key" \
+  --type "SecureString" \
+  --value file://path/to/service-account-key.json
+```
+
+**Option 3: Environment Variable (Less Secure)**
+```bash
+# Base64 encode the JSON key and set as environment variable
+export GOOGLE_SERVICE_ACCOUNT_JSON_B64=$(base64 -i service-account-key.json)
+```
+
+#### 🚀 **AWS Deployment Options**
+
+- **AWS ECS/Fargate**: Container-based deployment
+- **AWS EC2**: Traditional server deployment  
+- **AWS Lambda**: Serverless (with cold start considerations)
+- **AWS Elastic Beanstalk**: Platform-as-a-Service
+
+#### 🔒 **Security Best Practices for AWS**
+
+1. **Never store JSON keys in code or environment files**
+2. **Use AWS IAM roles for AWS services access**
+3. **Store Google credentials in AWS Secrets Manager**
+4. **Use HTTPS/TLS for all communications**
+5. **Enable AWS CloudTrail for audit logging**
+6. **Use AWS VPC for network isolation**
 
 ### Environment Variables
 

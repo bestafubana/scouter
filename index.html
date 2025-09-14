@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scouter</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👓</text></svg>">
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -633,10 +634,84 @@
                 <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment">
             </div>
             
-            <div class="loading" id="loadingSection">
-                <div class="spinner"></div>
-                <p>Processing your receipt...</p>
-                <small>This may take a few seconds</small>
+            <!-- Enhanced Processing Flow -->
+            <div class="processing-flow" id="processingFlow" style="display: none;">
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">🔄 Processing Receipt</h3>
+                    
+                    <!-- Progress Steps -->
+                    <div class="space-y-4" x-data="{ steps: [] }" x-init="window.progressSteps = $data">
+                        <template x-for="(step, index) in steps" :key="step.id">
+                            <div class="flex items-center space-x-4">
+                                <!-- Step Icon -->
+                                <div class="flex-shrink-0">
+                                    <div :class="{
+                                        'bg-blue-100 text-blue-600': step.status === 'processing',
+                                        'bg-green-100 text-green-600': step.status === 'completed',
+                                        'bg-red-100 text-red-600': step.status === 'error',
+                                        'bg-gray-100 text-gray-400': step.status === 'pending'
+                                    }" class="w-10 h-10 rounded-full flex items-center justify-center">
+                                        <template x-if="step.status === 'processing'">
+                                            <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                        </template>
+                                        <template x-if="step.status === 'completed'">
+                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                            </svg>
+                                        </template>
+                                        <template x-if="step.status === 'error'">
+                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                            </svg>
+                                        </template>
+                                        <template x-if="step.status === 'pending'">
+                                            <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
+                                        </template>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step Content -->
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-sm font-medium text-gray-900" x-text="step.name"></p>
+                                        <div class="flex items-center space-x-2">
+                                            <template x-if="step.status === 'processing' || step.status === 'completed'">
+                                                <span class="text-xs text-gray-500" x-text="step.progress + '%'"></span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <p class="text-sm text-gray-500" x-text="step.message"></p>
+                                    
+                                    <!-- Progress Bar -->
+                                    <template x-if="step.status === 'processing' || step.status === 'completed'">
+                                        <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+                                            <div :class="{
+                                                'bg-blue-600': step.status === 'processing',
+                                                'bg-green-600': step.status === 'completed'
+                                            }" class="h-2 rounded-full transition-all duration-300" :style="'width: ' + step.progress + '%'"></div>
+                                        </div>
+                                    </template>
+                                </div>
+                                
+                                <!-- Connection Line -->
+                                <template x-if="index < steps.length - 1">
+                                    <div class="absolute left-5 mt-10 w-px h-8 bg-gray-200"></div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <!-- Overall Progress -->
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Overall Progress</span>
+                            <span class="text-sm text-gray-500" id="overallProgress">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-3">
+                            <div id="overallProgressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="error" id="errorSection">
@@ -994,113 +1069,161 @@
                 }
 
                 try {
-                    this.showLoading();
                     this.hideError();
                     this.hideResults();
+                    this.showProcessingFlow();
 
-                    // Step 1: Extract text using Google Cloud Vision API (stub)
-                    const extractedText = await this.extractTextFromImage(this.capturedImageData);
-                    
-                    // Step 2: Process text with OpenAI to structure the data (stub)
-                    const structuredData = await this.structureReceiptData(extractedText);
-                    
-                    // Show results
-                    this.hideLoading();
-                    this.showSuccess();
-                    this.showResults(structuredData);
+                    // Initialize processing steps
+                    this.initializeProcessingSteps();
+
+                    // Start processing
+                    const response = await fetch('/api/receipt/process', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            image_data: this.capturedImageData
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to start processing');
+                    }
+
+                    const result = await response.json();
+                    const sessionId = result.session_id;
+
+                    // Poll for progress updates
+                    await this.pollProcessingProgress(sessionId);
                     
                 } catch (error) {
                     console.error('Processing error:', error);
-                    this.hideLoading();
+                    this.hideProcessingFlow();
                     this.showError(`Processing failed: ${error.message}`);
                 }
             }
 
-            // STUB: Google Cloud Vision API call
-            async extractTextFromImage(imageData) {
-                // Simulate API call delay
-                await this.delay(2000);
+            // Enhanced Processing Flow Methods
+            
+            initializeProcessingSteps() {
+                const steps = [
+                    {
+                        id: 'upload',
+                        name: 'Upload to S3',
+                        status: 'pending',
+                        progress: 0,
+                        message: 'Preparing to upload image...'
+                    },
+                    {
+                        id: 'document_ai',
+                        name: 'Google Document AI',
+                        status: 'pending',
+                        progress: 0,
+                        message: 'Waiting for upload to complete...'
+                    },
+                    {
+                        id: 'ai_processing',
+                        name: 'GPT Enhancement',
+                        status: 'pending',
+                        progress: 0,
+                        message: 'Waiting for Document AI processing...'
+                    },
+                    {
+                        id: 'validation',
+                        name: 'Data Validation',
+                        status: 'pending',
+                        progress: 0,
+                        message: 'Waiting for AI processing...'
+                    }
+                ];
                 
-                // This is a stub - in real implementation, you would:
-                // 1. Convert imageData to base64 if needed
-                // 2. Call Google Cloud Vision API
-                // 3. Return the extracted text
-                
-                console.log('🔍 Calling Google Cloud Vision API...');
-                console.log('Image data length:', imageData.length);
-                
-                // Mock extracted text from a receipt
-                return `FRESH MARKET
-123 Main Street
-Vancouver, BC V6B 1A1
-Tel: (604) 555-0123
-
-Date: 2024-01-15
-Time: 14:32:15
-Cashier: John D.
-
-ITEMS:
-Organic Bananas       $3.99
-Whole Milk 1L         $4.49
-Bread - Whole Wheat   $2.99
-Chicken Breast 1kg    $12.99
-Broccoli              $2.49
-Cheddar Cheese        $5.99
-
-Subtotal:            $32.94
-Tax (GST 5%):         $1.65
-Tax (PST 7%):         $2.31
-TOTAL:               $36.90
-
-Payment: Visa ****1234
-Approved: 123456
-
-Thank you for shopping!`;
+                // Update Alpine.js data
+                if (window.progressSteps) {
+                    window.progressSteps.steps = steps;
+                }
             }
-
-            // STUB: OpenAI API call to structure the data
-            async structureReceiptData(extractedText) {
-                // Simulate API call delay
-                await this.delay(1500);
+            
+            async pollProcessingProgress(sessionId) {
+                const maxAttempts = 60; // 60 seconds max
+                let attempts = 0;
                 
-                console.log('🤖 Calling OpenAI API...');
-                console.log('Extracted text:', extractedText);
+                while (attempts < maxAttempts) {
+                    try {
+                        const response = await fetch(`/api/receipt/progress/${sessionId}`);
+                        
+                        if (!response.ok) {
+                            throw new Error('Failed to get progress');
+                        }
+                        
+                        const data = await response.json();
+                        
+                        // Update progress steps
+                        this.updateProgressSteps(data.progress_updates);
+                        
+                        if (data.status === 'completed') {
+                            // Processing completed successfully
+                            this.hideProcessingFlow();
+                            this.showSuccess('Receipt processed successfully!');
+                            this.showResults(data.result.receipt_data);
+                            return;
+                        } else if (data.status === 'error') {
+                            // Processing failed
+                            throw new Error(data.error || 'Processing failed');
+                        }
+                        
+                        // Wait before next poll
+                        await this.delay(1000);
+                        attempts++;
+                        
+                    } catch (error) {
+                        console.error('Progress polling error:', error);
+                        this.hideProcessingFlow();
+                        this.showError(`Progress polling failed: ${error.message}`);
+                        return;
+                    }
+                }
                 
-                // This is a stub - in real implementation, you would:
-                // 1. Send extractedText to OpenAI with proper prompt
-                // 2. Parse the response to ensure valid JSON
-                // 3. Return structured data
+                // Timeout
+                this.hideProcessingFlow();
+                this.showError('Processing timeout. Please try again.');
+            }
+            
+            updateProgressSteps(progressUpdates) {
+                if (!window.progressSteps || !progressUpdates) return;
                 
-                // Mock structured receipt data
-                return {
-                    merchant: {
-                        name: "Fresh Market",
-                        address: "123 Main Street, Vancouver, BC V6B 1A1",
-                        phone: "(604) 555-0123"
-                    },
-                    transaction: {
-                        date: "2024-01-15",
-                        time: "14:32:15",
-                        cashier: "John D.",
-                        payment_method: "Visa ****1234",
-                        approval_code: "123456"
-                    },
-                    items: [
-                        { name: "Organic Bananas", price: 3.99, quantity: 1 },
-                        { name: "Whole Milk 1L", price: 4.49, quantity: 1 },
-                        { name: "Bread - Whole Wheat", price: 2.99, quantity: 1 },
-                        { name: "Chicken Breast 1kg", price: 12.99, quantity: 1 },
-                        { name: "Broccoli", price: 2.49, quantity: 1 },
-                        { name: "Cheddar Cheese", price: 5.99, quantity: 1 }
-                    ],
-                    totals: {
-                        subtotal: 32.94,
-                        gst: 1.65,
-                        pst: 2.31,
-                        total: 36.90
-                    },
-                    currency: "CAD"
-                };
+                // Create a map of latest updates for each step
+                const latestUpdates = {};
+                progressUpdates.forEach(update => {
+                    latestUpdates[update.step_id] = update;
+                });
+                
+                // Update steps with latest progress
+                window.progressSteps.steps.forEach(step => {
+                    const update = latestUpdates[step.id];
+                    if (update) {
+                        step.status = update.status;
+                        step.progress = update.progress;
+                        step.message = update.message;
+                    }
+                });
+                
+                // Calculate overall progress
+                const totalSteps = window.progressSteps.steps.length;
+                const completedSteps = window.progressSteps.steps.filter(s => s.status === 'completed').length;
+                const overallProgress = Math.round((completedSteps / totalSteps) * 100);
+                
+                // Update overall progress bar
+                const progressElement = document.getElementById('overallProgress');
+                const progressBarElement = document.getElementById('overallProgressBar');
+                
+                if (progressElement) {
+                    progressElement.textContent = overallProgress + '%';
+                }
+                if (progressBarElement) {
+                    progressBarElement.style.width = overallProgress + '%';
+                }
             }
 
             stopCamera() {
@@ -1116,6 +1239,20 @@ Thank you for shopping!`;
 
             hideLoading() {
                 this.loadingSection.classList.remove('active');
+            }
+            
+            showProcessingFlow() {
+                const processingFlow = document.getElementById('processingFlow');
+                if (processingFlow) {
+                    processingFlow.style.display = 'block';
+                }
+            }
+            
+            hideProcessingFlow() {
+                const processingFlow = document.getElementById('processingFlow');
+                if (processingFlow) {
+                    processingFlow.style.display = 'none';
+                }
             }
 
             showError(message) {

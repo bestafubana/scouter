@@ -1,0 +1,110 @@
+# Scouter Development Environment Configuration
+# Copy this file to .env and update with your actual values
+
+# =============================================================================
+# DEVELOPMENT MODE
+# =============================================================================
+DEV_MODE=True
+FLASK_ENV=development
+SECRET_KEY=dev-secret-key-change-in-production
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+# Development uses SQLite by default
+DATABASE_URL=sqlite:///scouter.db
+
+# =============================================================================
+# EMAIL CONFIGURATION (MailHog for Development)
+# =============================================================================
+MAIL_SERVER=localhost
+MAIL_PORT=1025
+MAIL_USE_TLS=False
+MAIL_USE_SSL=False
+MAIL_DEFAULT_SENDER=noreply@scouter.local
+
+# =============================================================================
+# AWS S3 CONFIGURATION (Receipt Image Storage)
+# =============================================================================
+# Replace with your actual AWS credentials for real S3 upload
+# Leave empty/commented for mock mode during development
+AWS_ACCESS_KEY_ID=your_aws_access_key_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
+AWS_DEFAULT_REGION=us-east-1
+S3_BUCKET_NAME=scouter-receipts-dev
+
+# S3 Configuration Options
+S3_REGION=us-east-1
+S3_ENDPOINT_URL=
+# For LocalStack or MinIO development, set endpoint:
+# S3_ENDPOINT_URL=http://localhost:4566
+
+# =============================================================================
+# OPENAI CONFIGURATION (AI Processing)
+# =============================================================================
+# Replace with your actual OpenAI API key for real AI processing
+# Leave empty/commented for mock mode during development
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4
+OPENAI_MAX_TOKENS=1500
+OPENAI_TEMPERATURE=0.1
+
+# =============================================================================
+# TESSERACT OCR CONFIGURATION
+# =============================================================================
+# Path to Tesseract executable (optional - uses system default if not set)
+# macOS with Homebrew: /usr/local/bin/tesseract or /opt/homebrew/bin/tesseract
+# Ubuntu/Debian: /usr/bin/tesseract
+# Windows: C:\Program Files\Tesseract-OCR\tesseract.exe
+TESSERACT_PATH=/usr/local/bin/tesseract
+
+# Tesseract OCR Configuration
+TESSERACT_CONFIG=--psm 6
+TESSERACT_LANG=eng
+
+# =============================================================================
+# RECEIPT PROCESSING CONFIGURATION
+# =============================================================================
+# Maximum file size for receipt uploads (in bytes)
+MAX_RECEIPT_SIZE=10485760  # 10MB
+
+# Processing timeout (in seconds)
+PROCESSING_TIMEOUT=60
+
+# Session cleanup interval (in seconds)
+SESSION_CLEANUP_INTERVAL=3600  # 1 hour
+
+# =============================================================================
+# DEVELOPMENT TOOLS
+# =============================================================================
+# Enable debug logging
+DEBUG_LOGGING=True
+
+# Enable API request logging
+LOG_API_REQUESTS=True
+
+# Enable processing session debugging
+DEBUG_PROCESSING_SESSIONS=True
+
+# =============================================================================
+# PRODUCTION OVERRIDES (for when DEV_MODE=False)
+# =============================================================================
+# Uncomment and configure for production deployment
+
+# Production Database
+# DATABASE_URL=postgresql://user:password@localhost:5432/scouter_prod
+
+# Production Email (Amazon SES)
+# AWS_SES_USERNAME=your_ses_username
+# AWS_SES_PASSWORD=your_ses_password
+# FROM_EMAIL=noreply@yourdomain.com
+# MAIL_SERVER=email-smtp.us-east-1.amazonaws.com
+# MAIL_PORT=587
+# MAIL_USE_TLS=True
+
+# Production S3 Bucket
+# S3_BUCKET_NAME=scouter-receipts-prod
+
+# Production Security
+# SECRET_KEY=your-super-secure-secret-key-here
+# FLASK_ENV=production

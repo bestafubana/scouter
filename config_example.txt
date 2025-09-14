@@ -1,0 +1,25 @@
+# Scouter Environment Configuration
+# Create a .env file in the project root with these variables:
+
+# AWS S3 Configuration (for receipt image storage)
+AWS_ACCESS_KEY_ID=your_aws_access_key_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
+S3_BUCKET_NAME=scouter-receipts
+
+# OpenAI Configuration (for AI processing)
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Tesseract Configuration (optional - system default if not specified)
+TESSERACT_PATH=/usr/local/bin/tesseract
+
+# Database Configuration (production)
+DATABASE_URL=postgresql://user:pass@localhost/scouter
+
+# Email Configuration (production)
+AWS_SES_USERNAME=your_ses_username
+AWS_SES_PASSWORD=your_ses_password
+FROM_EMAIL=noreply@yourdomain.com
+
+# Security
+SECRET_KEY=your-secret-key-here
+FLASK_ENV=development
