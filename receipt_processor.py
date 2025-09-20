@@ -573,7 +573,29 @@ class OpenAIProcessor:
             processing_time = time.time() - start_time
             
             # Parse the response
-            structured_data = json.loads(response.choices[0].message.content)
+            content = response.choices[0].message.content
+            print(f"🔍 OpenAI Response Content: '{content}'")
+            
+            if not content or content.strip() == "":
+                print("⚠️ OpenAI returned empty content")
+                return {
+                    'success': False,
+                    'error': 'OpenAI returned empty response',
+                    'processing_time': round(processing_time, 2),
+                    'mock': False
+                }
+            
+            try:
+                structured_data = json.loads(content)
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON Parse Error: {e}")
+                print(f"Raw content: {repr(content)}")
+                return {
+                    'success': False,
+                    'error': f'Invalid JSON response from OpenAI: {str(e)}',
+                    'processing_time': round(processing_time, 2),
+                    'mock': False
+                }
             
             return {
                 'success': True,
@@ -695,7 +717,29 @@ class OpenAIProcessor:
             processing_time = time.time() - start_time
             
             # Parse the response
-            enhanced_data = json.loads(response.choices[0].message.content)
+            content = response.choices[0].message.content
+            print(f"🔍 OpenAI Enhancement Response: '{content}'")
+            
+            if not content or content.strip() == "":
+                print("⚠️ OpenAI returned empty content for enhancement")
+                return {
+                    'success': False,
+                    'error': 'OpenAI returned empty response',
+                    'processing_time': round(processing_time, 2),
+                    'mock': False
+                }
+            
+            try:
+                enhanced_data = json.loads(content)
+            except json.JSONDecodeError as e:
+                print(f"❌ Enhancement JSON Parse Error: {e}")
+                print(f"Raw content: {repr(content)}")
+                return {
+                    'success': False,
+                    'error': f'Invalid JSON response from OpenAI: {str(e)}',
+                    'processing_time': round(processing_time, 2),
+                    'mock': False
+                }
             
             return {
                 'success': True,
@@ -832,6 +876,10 @@ class ReceiptProcessor:
                 'processing_id': processing_id,
                 'success': True,
                 'receipt_data': ai_result['data'],
+                's3_url': upload_result.get('url'),
+                'document_ai_result': document_ai_result,
+                'ai_result': ai_result,
+                'confidence_score': ai_result.get('confidence_score', 0),
                 'processing_metadata': {
                     'started_at': start_time.isoformat(),
                     'completed_at': end_time.isoformat(),
@@ -852,7 +900,8 @@ class ReceiptProcessor:
                 if step.status == "pending" or step.status == "processing":
                     await self._update_step(step.id, "error", 0, f"Processing failed: {str(e)}", progress_callback)
             
-            return {
+            # Include successful intermediate results even when processing fails
+            error_result = {
                 'processing_id': processing_id,
                 'success': False,
                 'error': str(e),
@@ -862,6 +911,20 @@ class ReceiptProcessor:
                     'steps': [asdict(step) for step in self.processing_steps]
                 }
             }
+            
+            # Add successful intermediate results if they exist
+            # These variables might not be defined if the error occurred early
+            try:
+                if 'upload_result' in locals() and upload_result and upload_result.get('success'):
+                    error_result['s3_url'] = upload_result.get('url')
+                if 'document_ai_result' in locals() and document_ai_result:
+                    error_result['document_ai_result'] = document_ai_result
+                if 'ai_result' in locals() and ai_result:
+                    error_result['ai_result'] = ai_result
+            except:
+                pass  # Ignore errors when adding intermediate results
+            
+            return error_result
     
     async def _update_step(self, step_id: str, status: str, progress: int, message: str, callback: Callable = None):
         """Update a processing step and call the progress callback"""

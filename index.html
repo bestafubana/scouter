@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scouter</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👓</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- UI Updated: New Horizontal Flow Graph -->
     <style>
         * {
             margin: 0;
@@ -28,6 +30,19 @@
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
+        }
+        
+        /* Expand container on desktop for better flow visualization */
+        @media (min-width: 768px) {
+            .container {
+                max-width: 900px;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .container {
+                max-width: 1200px;
+            }
         }
 
         .header {
@@ -634,81 +649,391 @@
                 <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment">
             </div>
             
-            <!-- Enhanced Processing Flow -->
+            <!-- Horizontal Flow Graph -->
             <div class="processing-flow" id="processingFlow" style="display: none;">
-                <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-                    <h3 class="text-lg font-semibold text-gray-800 mb-4">🔄 Processing Receipt</h3>
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6 max-w-6xl mx-auto">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-6">🔄 Processing Receipt</h3>
                     
-                    <!-- Progress Steps -->
-                    <div class="space-y-4" x-data="{ steps: [] }" x-init="window.progressSteps = $data">
-                        <template x-for="(step, index) in steps" :key="step.id">
-                            <div class="flex items-center space-x-4">
-                                <!-- Step Icon -->
-                                <div class="flex-shrink-0">
-                                    <div :class="{
-                                        'bg-blue-100 text-blue-600': step.status === 'processing',
-                                        'bg-green-100 text-green-600': step.status === 'completed',
-                                        'bg-red-100 text-red-600': step.status === 'error',
-                                        'bg-gray-100 text-gray-400': step.status === 'pending'
-                                    }" class="w-10 h-10 rounded-full flex items-center justify-center">
-                                        <template x-if="step.status === 'processing'">
-                                            <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                        </template>
-                                        <template x-if="step.status === 'completed'">
-                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </template>
-                                        <template x-if="step.status === 'error'">
-                                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                                            </svg>
-                                        </template>
-                                        <template x-if="step.status === 'pending'">
-                                            <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
-                                        </template>
-                                    </div>
-                                </div>
-                                
-                                <!-- Step Content -->
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center justify-between">
-                                        <p class="text-sm font-medium text-gray-900" x-text="step.name"></p>
-                                        <div class="flex items-center space-x-2">
-                                            <template x-if="step.status === 'processing' || step.status === 'completed'">
-                                                <span class="text-xs text-gray-500" x-text="step.progress + '%'"></span>
-                                            </template>
-                                        </div>
-                                    </div>
-                                    <p class="text-sm text-gray-500" x-text="step.message"></p>
-                                    
-                                    <!-- Progress Bar -->
-                                    <template x-if="step.status === 'processing' || step.status === 'completed'">
-                                        <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+                    <!-- Horizontal Flow Graph -->
+                    <div x-data="{ 
+                        steps: [], 
+                        currentStep: '', 
+                        showDetails: false,
+                        allUpdates: [],
+                        showReviewForm: false,
+                        reviewData: {},
+                        activeTab: 'review',
+                        isVerified: false
+                    }" x-init="window.progressSteps = $data">
+                        
+                        <!-- Flow Graph -->
+                        <div class="flex items-center justify-center mb-6 overflow-x-auto">
+                            <div class="flex items-center space-x-4 min-w-max px-4">
+                                <template x-for="(step, index) in steps" :key="step.id">
+                                    <div class="flex items-center">
+                                        <!-- Step Circle -->
+                                        <div class="relative">
                                             <div :class="{
-                                                'bg-blue-600': step.status === 'processing',
-                                                'bg-green-600': step.status === 'completed'
-                                            }" class="h-2 rounded-full transition-all duration-300" :style="'width: ' + step.progress + '%'"></div>
+                                                'bg-blue-500 border-blue-500 text-white animate-pulse': step.status === 'processing',
+                                                'bg-green-500 border-green-500 text-white': step.status === 'completed',
+                                                'bg-red-500 border-red-500 text-white': step.status === 'error',
+                                                'bg-gray-200 border-gray-300 text-gray-400': step.status === 'pending'
+                                            }" class="w-12 h-12 rounded-full border-2 flex items-center justify-center font-semibold text-sm transition-all duration-300">
+                                                <template x-if="step.status === 'processing'">
+                                                    <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                </template>
+                                                <template x-if="step.status === 'completed'">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                                    </svg>
+                                                </template>
+                                                <template x-if="step.status === 'error'">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                                    </svg>
+                                                </template>
+                                                <template x-if="step.status === 'pending'">
+                                                    <span x-text="index + 1"></span>
+                                                </template>
+                                            </div>
+                                            <!-- Step Label -->
+                                            <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 whitespace-nowrap font-medium">
+                                                <span x-text="step.name.replace('Upload to ', '').replace('Google Document ', '').replace('GPT ', '').replace('Data ', '')"></span>
+                                            </div>
                                         </div>
-                                    </template>
-                                </div>
-                                
-                                <!-- Connection Line -->
-                                <template x-if="index < steps.length - 1">
-                                    <div class="absolute left-5 mt-10 w-px h-8 bg-gray-200"></div>
+                                        
+                                        <!-- Connection Line -->
+                                        <template x-if="index < steps.length - 1">
+                                            <div class="w-16 h-0.5 mx-2" :class="{
+                                                'bg-green-500': step.status === 'completed',
+                                                'bg-gray-300': step.status !== 'completed'
+                                            }"></div>
+                                        </template>
+                                    </div>
                                 </template>
                             </div>
-                        </template>
-                    </div>
-                    
-                    <!-- Overall Progress -->
-                    <div class="mt-6 pt-4 border-t border-gray-200">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-sm font-medium text-gray-700">Overall Progress</span>
-                            <span class="text-sm text-gray-500" id="overallProgress">0%</span>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-3">
-                            <div id="overallProgressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        
+                        <!-- Current Status -->
+                        <div class="text-center mb-4">
+                            <div class="text-lg font-medium text-gray-800" x-text="currentStep"></div>
+                            <div class="text-sm text-gray-600 mt-1">
+                                <span x-text="steps.filter(s => s.status === 'completed').length"></span> of 
+                                <span x-text="steps.length"></span> steps completed
+                            </div>
+                        </div>
+                        
+                        <!-- Expandable Details -->
+                        <div class="text-center">
+                            <button @click="showDetails = !showDetails" 
+                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center mx-auto">
+                                <span x-text="showDetails ? 'Hide Details' : 'Show Details'"></span>
+                                <svg :class="{ 'rotate-180': showDetails }" class="w-4 h-4 ml-1 transform transition-transform">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Detailed Progress (Expandable) -->
+                        <div x-show="showDetails" x-transition class="mt-6 space-y-3 border-t pt-4">
+                            <template x-for="(step, index) in steps" :key="step.id">
+                                <div class="flex items-start space-x-3 p-3 rounded-lg" :class="{
+                                    'bg-blue-50': step.status === 'processing',
+                                    'bg-green-50': step.status === 'completed',
+                                    'bg-red-50': step.status === 'error',
+                                    'bg-gray-50': step.status === 'pending'
+                                }">
+                                    <div class="flex-shrink-0 mt-1">
+                                        <div :class="{
+                                            'bg-blue-500 text-white': step.status === 'processing',
+                                            'bg-green-500 text-white': step.status === 'completed',
+                                            'bg-red-500 text-white': step.status === 'error',
+                                            'bg-gray-300 text-gray-600': step.status === 'pending'
+                                        }" class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                                            <span x-text="index + 1"></span>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <h4 class="font-medium text-gray-900" x-text="step.name"></h4>
+                                            <span class="text-xs text-gray-500" x-text="step.progress + '%'"></span>
+                                        </div>
+                                        <p class="text-sm text-gray-600 mt-1" x-text="step.message"></p>
+                                        <template x-if="step.status === 'processing'">
+                                            <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                                <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                                                     :style="'width: ' + step.progress + '%'"></div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Human Review Form -->
+            <div class="processing-flow" id="humanReviewSection" style="display: none;">
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6 max-w-6xl mx-auto">
+                    <div x-data="{
+                        get reviewData() { return window.progressSteps?.reviewData || {}; },
+                        get receiptId() { return window.progressSteps?.receiptId || ''; },
+                        get showReviewForm() { return window.progressSteps?.showReviewForm || false; },
+                        get isVerified() { return window.progressSteps?.isVerified || false; },
+                        get activeTab() { return window.progressSteps?.activeTab || 'review'; },
+                        set activeTab(value) { if (window.progressSteps) window.progressSteps.activeTab = value; },
+                        updateField(field, value) {
+                            if (window.progressSteps && window.progressSteps.reviewData) {
+                                window.progressSteps.reviewData[field] = value;
+                            }
+                        }
+                    }">
+                        <div x-show="showReviewForm && !isVerified" x-transition>
+                            <h3 class="text-lg font-semibold text-gray-800 mb-6">👤 Human Review Required</h3>
+                            <p class="text-gray-600 mb-6">Please review and verify the extracted receipt data. You can edit any fields that need correction.</p>
+                            
+                            <!-- Tabs -->
+                            <div class="border-b border-gray-200 mb-6">
+                                <nav class="-mb-px flex space-x-8">
+                                    <button @click="activeTab = 'review'" 
+                                            :class="activeTab === 'review' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                            class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                                        📝 Review & Edit
+                                    </button>
+                                    <button @click="activeTab = 'raw'" 
+                                            :class="activeTab === 'raw' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                            class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                                        📄 Raw Data
+                                    </button>
+                                </nav>
+                            </div>
+                            
+                            <!-- Review Tab -->
+                            <div x-show="activeTab === 'review'" class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- Basic Information -->
+                                    <div class="space-y-4">
+                                        <h4 class="font-semibold text-gray-800">Basic Information</h4>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Vendor Name</label>
+                                            <input type="text" 
+                                                   :value="reviewData.vendor_name" 
+                                                   @input="updateField('vendor_name', $event.target.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Receipt Date</label>
+                                            <input type="date" 
+                                                   :value="reviewData.receipt_date" 
+                                                   @input="updateField('receipt_date', $event.target.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                            <input type="text" 
+                                                   :value="reviewData.location" 
+                                                   @input="updateField('location', $event.target.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                                            <input type="text" 
+                                                   :value="reviewData.payment_method" 
+                                                   @input="updateField('payment_method', $event.target.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Financial Information -->
+                                    <div class="space-y-4">
+                                        <h4 class="font-semibold text-gray-800">Financial Details</h4>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
+                                            <input type="number" step="0.01" 
+                                                   :value="reviewData.amount_total" 
+                                                   @input="updateField('amount_total', $event.target.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Subtotal</label>
+                                            <input type="number" step="0.01" 
+                                                   :value="reviewData.amount_subtotal" 
+                                                   @input="updateField('amount_subtotal', $event.target.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Tax Amount</label>
+                                            <input type="number" step="0.01" 
+                                                   :value="reviewData.tax_amount" 
+                                                   @input="updateField('tax_amount', $event.target.value)"
+                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                                            <select :value="reviewData.currency" 
+                                                    @change="updateField('currency', $event.target.value)"
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="USD">USD</option>
+                                                <option value="CAD">CAD</option>
+                                                <option value="EUR">EUR</option>
+                                                <option value="GBP">GBP</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                            <select :value="reviewData.category" 
+                                                    @change="updateField('category', $event.target.value)"
+                                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                <option value="">Select Category</option>
+                                                <option value="Meals">Meals</option>
+                                                <option value="Office Supplies">Office Supplies</option>
+                                                <option value="Travel">Travel</option>
+                                                <option value="Equipment">Equipment</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Notes -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                                    <textarea :value="reviewData.notes" 
+                                              @input="updateField('notes', $event.target.value)"
+                                              rows="3" 
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                              placeholder="Add any additional notes about this receipt..."></textarea>
+                                </div>
+                                
+                                <!-- Verification Button -->
+                                <div class="flex justify-center pt-4">
+                                    <button @click="verifyReceipt()" 
+                                            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 flex items-center space-x-2">
+                                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        <span>Mark as Verified</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Raw Data Tab -->
+                            <div x-show="activeTab === 'raw'" class="space-y-4">
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h4 class="font-semibold text-gray-800 mb-3">GPT Extracted Data (JSON)</h4>
+                                    <pre class="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto" x-text="JSON.stringify(reviewData.rawAiData || {}, null, 2)"></pre>
+                                </div>
+                                <div class="bg-blue-50 rounded-lg p-4">
+                                    <h4 class="font-semibold text-gray-800 mb-3">Debug: Current Form Data</h4>
+                                    <pre class="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto" x-text="JSON.stringify(reviewData, null, 2)"></pre>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Final Verified Display -->
+                        <div x-show="isVerified">
+                            <h3 class="text-lg font-semibold text-green-800 mb-6">✅ Receipt Verified</h3>
+                            <p class="text-gray-600 mb-6">The receipt data has been reviewed and verified.</p>
+                            
+                            <!-- Tabs for Final Display -->
+                            <div class="border-b border-gray-200 mb-6">
+                                <nav class="-mb-px flex space-x-8">
+                                    <button @click="activeTab = 'review'" 
+                                            :class="activeTab === 'review' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                            class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                                        📝 Final Data
+                                    </button>
+                                    <button @click="activeTab = 'raw'" 
+                                            :class="activeTab === 'raw' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                            class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+                                        📄 Raw Data
+                                    </button>
+                                </nav>
+                            </div>
+                            
+                            <!-- Final Data Tab (Read-only) -->
+                            <div x-show="activeTab === 'review'" class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <!-- Basic Information -->
+                                    <div class="space-y-4">
+                                        <h4 class="font-semibold text-gray-800">Basic Information</h4>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Vendor Name</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.vendor_name || 'N/A'"></div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Receipt Date</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.receipt_date || 'N/A'"></div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.location || 'N/A'"></div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.payment_method || 'N/A'"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Financial Information -->
+                                    <div class="space-y-4">
+                                        <h4 class="font-semibold text-gray-800">Financial Details</h4>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.amount_total ? '$' + reviewData.amount_total : 'N/A'"></div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Subtotal</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.amount_subtotal ? '$' + reviewData.amount_subtotal : 'N/A'"></div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Tax Amount</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.tax_amount ? '$' + reviewData.tax_amount : 'N/A'"></div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.currency || 'N/A'"></div>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                            <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.category || 'N/A'"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Notes -->
+                                <div x-show="reviewData.notes">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                                    <div class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-800" x-text="reviewData.notes"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Final Raw Data Tab -->
+                            <div x-show="activeTab === 'raw'" class="space-y-4">
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h4 class="font-semibold text-gray-800 mb-3">GPT Extracted Data (JSON)</h4>
+                                    <pre class="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto" x-text="JSON.stringify(reviewData.rawAiData || {}, null, 2)"></pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1131,11 +1456,18 @@
                         message: 'Waiting for Document AI processing...'
                     },
                     {
+                        id: 'human_review',
+                        name: 'Human Review',
+                        status: 'pending',
+                        progress: 0,
+                        message: 'Waiting for AI processing...'
+                    },
+                    {
                         id: 'validation',
                         name: 'Data Validation',
                         status: 'pending',
                         progress: 0,
-                        message: 'Waiting for AI processing...'
+                        message: 'Waiting for human review...'
                     }
                 ];
                 
@@ -1167,6 +1499,10 @@
                             this.hideProcessingFlow();
                             this.showSuccess('Receipt processed successfully!');
                             this.showResults(data.result.receipt_data);
+                            return;
+                        } else if (data.status === 'awaiting_human_review') {
+                            // Show human review form
+                            this.showHumanReviewForm(data.result);
                             return;
                         } else if (data.status === 'error') {
                             // Processing failed
@@ -1209,20 +1545,22 @@
                     }
                 });
                 
-                // Calculate overall progress
-                const totalSteps = window.progressSteps.steps.length;
-                const completedSteps = window.progressSteps.steps.filter(s => s.status === 'completed').length;
-                const overallProgress = Math.round((completedSteps / totalSteps) * 100);
+                // Set current step message
+                const currentProcessingStep = window.progressSteps.steps.find(s => s.status === 'processing');
+                const lastCompletedStep = window.progressSteps.steps.filter(s => s.status === 'completed').pop();
                 
-                // Update overall progress bar
-                const progressElement = document.getElementById('overallProgress');
-                const progressBarElement = document.getElementById('overallProgressBar');
-                
-                if (progressElement) {
-                    progressElement.textContent = overallProgress + '%';
-                }
-                if (progressBarElement) {
-                    progressBarElement.style.width = overallProgress + '%';
+                if (currentProcessingStep) {
+                    window.progressSteps.currentStep = currentProcessingStep.message;
+                } else if (lastCompletedStep) {
+                    window.progressSteps.currentStep = lastCompletedStep.message;
+                } else {
+                    const completedCount = window.progressSteps.steps.filter(s => s.status === 'completed').length;
+                    const totalCount = window.progressSteps.steps.length;
+                    if (completedCount === totalCount) {
+                        window.progressSteps.currentStep = 'Processing complete!';
+                    } else {
+                        window.progressSteps.currentStep = 'Initializing...';
+                    }
                 }
             }
 
@@ -1252,6 +1590,129 @@
                 const processingFlow = document.getElementById('processingFlow');
                 if (processingFlow) {
                     processingFlow.style.display = 'none';
+                }
+            }
+            
+            showHumanReviewForm(result) {
+                console.log('🔍 showHumanReviewForm called with result:', result);
+                
+                // Hide processing flow
+                this.hideProcessingFlow();
+                
+                // Show human review section
+                const humanReviewSection = document.getElementById('humanReviewSection');
+                if (humanReviewSection) {
+                    humanReviewSection.style.display = 'block';
+                }
+                
+                // Populate review data from AI result
+                if (window.progressSteps && result) {
+                    // Extract data from AI result - handle both successful and manual entry cases
+                    const aiData = result.ai_result?.data || {};
+                    console.log('📝 AI data extracted:', aiData);
+                    
+                    // Populate the form data
+                    window.progressSteps.reviewData = {
+                        vendor_name: aiData.vendor_name || '',
+                        receipt_date: aiData.receipt_date || '',
+                        location: aiData.location || '',
+                        payment_method: aiData.payment_method || '',
+                        amount_total: aiData.amount_total || '',
+                        amount_subtotal: aiData.amount_subtotal || '',
+                        tax_amount: aiData.tax_amount || '',
+                        currency: aiData.currency || 'USD',
+                        category: aiData.category || '',
+                        notes: '',
+                        rawAiData: result.ai_result || {}
+                    };
+                    
+                    // Store receipt ID for verification
+                    window.progressSteps.receiptId = result.receipt_id;
+                    
+                    // Show the review form (not the verified form)
+                    window.progressSteps.showReviewForm = true;
+                    window.progressSteps.isVerified = false;
+                    window.progressSteps.activeTab = 'review';
+                    
+                    console.log('✅ Form data populated:', window.progressSteps.reviewData);
+                    console.log('🎯 Form state - showReviewForm:', window.progressSteps.showReviewForm, 'isVerified:', window.progressSteps.isVerified);
+                    
+                    // Update human review step to processing
+                    const humanReviewStep = window.progressSteps.steps.find(s => s.id === 'human_review');
+                    if (humanReviewStep) {
+                        humanReviewStep.status = 'processing';
+                        humanReviewStep.message = 'Awaiting human review and verification...';
+                        humanReviewStep.progress = 50;
+                    }
+                    
+                    // Force Alpine.js to update
+                    if (window.Alpine) {
+                        window.Alpine.nextTick(() => {
+                            console.log('🔄 Alpine.js updated');
+                        });
+                    }
+                }
+            }
+            
+            hideHumanReviewForm() {
+                const humanReviewSection = document.getElementById('humanReviewSection');
+                if (humanReviewSection) {
+                    humanReviewSection.style.display = 'none';
+                }
+            }
+            
+            async verifyReceipt() {
+                if (!window.progressSteps || !window.progressSteps.receiptId) {
+                    this.showError('No receipt data to verify');
+                    return;
+                }
+                
+                try {
+                    // Send verification data to backend
+                    const response = await fetch('/api/receipt/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            receipt_id: window.progressSteps.receiptId,
+                            verified_data: window.progressSteps.reviewData
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to verify receipt');
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Update UI to show verification complete
+                    window.progressSteps.isVerified = true;
+                    window.progressSteps.activeTab = 'review';
+                    
+                    // Update human review step to completed
+                    const humanReviewStep = window.progressSteps.steps.find(s => s.id === 'human_review');
+                    if (humanReviewStep) {
+                        humanReviewStep.status = 'completed';
+                        humanReviewStep.message = 'Human review completed and verified';
+                        humanReviewStep.progress = 100;
+                    }
+                    
+                    // Update validation step to completed
+                    const validationStep = window.progressSteps.steps.find(s => s.id === 'validation');
+                    if (validationStep) {
+                        validationStep.status = 'completed';
+                        validationStep.message = 'Receipt processing completed successfully';
+                        validationStep.progress = 100;
+                    }
+                    
+                    // Update current step message
+                    window.progressSteps.currentStep = 'Receipt verified and processing completed!';
+                    
+                } catch (error) {
+                    console.error('Verification error:', error);
+                    this.showError(`Verification failed: ${error.message}`);
                 }
             }
 
@@ -1640,6 +2101,57 @@
         document.addEventListener('DOMContentLoaded', () => {
             scouter = new Scouter();
         });
+        
+        // Global function for Alpine.js to call
+        window.verifyReceipt = function() {
+            if (scouter) {
+                scouter.verifyReceipt();
+            }
+        };
+        
+        // Debug function to test human review form
+        window.testHumanReview = function() {
+            console.log('🧪 Testing human review form...');
+            
+            // Initialize progressSteps if not exists
+            if (!window.progressSteps) {
+                window.progressSteps = {
+                    reviewData: {},
+                    receiptId: '',
+                    showReviewForm: false,
+                    isVerified: false,
+                    activeTab: 'review'
+                };
+            }
+            
+            // Set test data
+            window.progressSteps.reviewData = {
+                vendor_name: 'Test Vendor',
+                receipt_date: '2025-09-20',
+                location: 'Test Location',
+                payment_method: 'Credit Card',
+                amount_total: '25.99',
+                amount_subtotal: '23.99',
+                tax_amount: '2.00',
+                currency: 'USD',
+                category: 'Meals',
+                notes: 'Test notes',
+                rawAiData: { test: 'data' }
+            };
+            
+            window.progressSteps.receiptId = 'test-receipt-id';
+            window.progressSteps.showReviewForm = true;
+            window.progressSteps.isVerified = false;
+            window.progressSteps.activeTab = 'review';
+            
+            // Show the form
+            const humanReviewSection = document.getElementById('humanReviewSection');
+            if (humanReviewSection) {
+                humanReviewSection.style.display = 'block';
+            }
+            
+            console.log('✅ Test data set:', window.progressSteps);
+        };
         
         // Cleanup on page unload
         window.addEventListener('beforeunload', () => {

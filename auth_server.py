@@ -1160,25 +1160,26 @@ def process_receipt():
                     try:
                         db_receipt = Receipt.query.get(receipt.id)
                         if db_receipt:
-                            # Update status based on step
-                            step = update.get('step', '')
-                            if 's3' in step.lower():
+                            step_id = update.get('step_id', '')
+                            status = update.get('status', '')
+                            
+                            # Update status based on step completion
+                            if step_id == 'upload' and status == 'completed':
                                 db_receipt.status = ReceiptStatus.UPLOADED.value
-                                if update.get('completed') and update.get('result', {}).get('s3_url'):
-                                    db_receipt.s3_url = update['result']['s3_url']
-                            elif 'ocr' in step.lower() or 'document' in step.lower():
-                                if update.get('completed'):
-                                    db_receipt.status = ReceiptStatus.OCR_DONE.value
-                                    if update.get('result', {}).get('text'):
-                                        db_receipt.ocr_raw_text = update['result']['text']
-                            elif 'ai' in step.lower() or 'gpt' in step.lower():
-                                if update.get('completed'):
-                                    db_receipt.status = ReceiptStatus.AI_DONE.value
-                                    if update.get('result', {}).get('confidence_score'):
-                                        db_receipt.ai_confidence_score = update['result']['confidence_score']
-                                    if update.get('result', {}).get('structured_data'):
-                                        db_receipt.ai_review_json = update['result']['structured_data']
-                                        db_receipt.ai_reviewed_at = datetime.now()
+                                # S3 URL will be updated in final result processing
+                            elif step_id == 'document_ai' and status == 'completed':
+                                db_receipt.status = ReceiptStatus.OCR_DONE.value
+                                # OCR text will be updated in final result processing
+                            elif step_id == 'ai_processing' and status == 'completed':
+                                db_receipt.status = ReceiptStatus.AI_DONE.value
+                                # AI data will be updated in final result processing
+                                # After AI processing, trigger human review
+                                active_processing_sessions[session_id]['status'] = 'awaiting_human_review'
+                            elif step_id == 'human_review' and status == 'completed':
+                                db_receipt.status = ReceiptStatus.AWAITING_USER_REVIEW.value
+                            elif step_id == 'validation' and status == 'completed':
+                                # Final validation step - will be updated with final result
+                                pass
                             
                             db_receipt.updated_at = datetime.now()
                             db.session.commit()
@@ -1192,22 +1193,146 @@ def process_receipt():
                 
                 # Store final result and update database
                 active_processing_sessions[session_id]['result'] = result
-                active_processing_sessions[session_id]['status'] = 'completed'
                 
-                # Final database update
+                # Check if we need human review (have some extracted data to review)
+                # Trigger human review if we have S3 upload success (always allow manual entry)
+                has_s3_upload = result.get('s3_url')
+                has_document_ai = result.get('document_ai_result', {}).get('success')
+                has_ai_result = result.get('ai_result', {}).get('success')
+                
+                if has_s3_upload:
+                    # Set status to awaiting human review instead of completed
+                    active_processing_sessions[session_id]['status'] = 'awaiting_human_review'
+                    # Add receipt_id to result for frontend
+                    result['receipt_id'] = str(receipt.id)
+                    
+                    # If we don't have successful AI result, create a basic structure for manual entry
+                    if not has_ai_result:
+                        result['ai_result'] = {
+                            'data': {
+                                'vendor_name': '',
+                                'receipt_date': '',
+                                'amount_total': '',
+                                'amount_subtotal': '',
+                                'tax_amount': '',
+                                'currency': 'USD',
+                                'location': '',
+                                'payment_method': '',
+                                'category': ''
+                            },
+                            'success': True,
+                            'manual_entry': True
+                        }
+                else:
+                    # No S3 upload, mark as completed with error
+                    active_processing_sessions[session_id]['status'] = 'completed'
+                
+                # Final database update with all processing results
                 with app.app_context():
                     try:
                         db_receipt = Receipt.query.get(receipt.id)
-                        if db_receipt and result:
-                            # Determine final status based on confidence
-                            confidence = result.get('confidence_score', 0)
-                            if confidence >= 0.8:
-                                db_receipt.status = ReceiptStatus.AWAITING_USER_REVIEW.value
+                        if db_receipt:
+                            # Extract data from successful steps even if overall processing failed
+                            if result and result.get('processing_metadata', {}).get('steps'):
+                                steps = result['processing_metadata']['steps']
+                                
+                                # Extract S3 URL from upload step
+                                upload_step = next((s for s in steps if s['id'] == 'upload' and s['status'] == 'completed'), None)
+                                if upload_step and 'S3 URL:' in upload_step.get('message', ''):
+                                    # Extract S3 URL from message like "Image uploaded successfully (287 bytes) - S3 URL: https://..."
+                                    message = upload_step['message']
+                                    if 'S3 URL:' in message:
+                                        s3_url = message.split('S3 URL:')[1].strip()
+                                        db_receipt.s3_url = s3_url
+                                
+                                # Extract OCR text from document AI step
+                                doc_ai_step = next((s for s in steps if s['id'] == 'document_ai' and s['status'] == 'completed'), None)
+                                if doc_ai_step and 'words' in doc_ai_step.get('message', ''):
+                                    # This indicates successful OCR processing
+                                    # The actual text would need to be stored in the step result
+                                    pass
+                            
+                            # Save successful result data if available
+                            if result and result.get('success'):
+                                # Save S3 URL
+                                if result.get('s3_url'):
+                                    db_receipt.s3_url = result['s3_url']
+                                
+                                # Save OCR results
+                                if result.get('document_ai_result'):
+                                    db_receipt.ocr_raw_text = result['document_ai_result'].get('text', '')
+                                
+                                # Save AI processing results and extract structured data
+                                if result.get('ai_result'):
+                                    ai_data = result['ai_result']
+                                    db_receipt.ai_review_json = ai_data
+                                    db_receipt.ai_reviewed_at = datetime.now()
+                                    
+                                    # Extract structured data from AI result to populate receipt fields
+                                    if ai_data.get('data'):
+                                        receipt_data = ai_data['data']
+                                        
+                                        # Populate receipt fields from AI extraction
+                                        if receipt_data.get('receipt_date'):
+                                            try:
+                                                from datetime import datetime as dt
+                                                db_receipt.receipt_date = dt.strptime(receipt_data['receipt_date'], '%Y-%m-%d').date()
+                                            except:
+                                                pass
+                                        
+                                        if receipt_data.get('amount_total'):
+                                            try:
+                                                db_receipt.amount_total = float(receipt_data['amount_total'])
+                                            except:
+                                                pass
+                                        
+                                        if receipt_data.get('amount_subtotal'):
+                                            try:
+                                                db_receipt.amount_subtotal = float(receipt_data['amount_subtotal'])
+                                            except:
+                                                pass
+                                        
+                                        if receipt_data.get('tax_amount'):
+                                            try:
+                                                db_receipt.tax_amount = float(receipt_data['tax_amount'])
+                                            except:
+                                                pass
+                                        
+                                        if receipt_data.get('currency'):
+                                            db_receipt.currency = receipt_data['currency']
+                                        
+                                        if receipt_data.get('vendor_name'):
+                                            db_receipt.vendor_name = receipt_data['vendor_name']
+                                        
+                                        if receipt_data.get('location'):
+                                            db_receipt.location = receipt_data['location']
+                                        
+                                        if receipt_data.get('payment_method'):
+                                            db_receipt.payment_method = receipt_data['payment_method']
+                                        
+                                        if receipt_data.get('category'):
+                                            db_receipt.category = receipt_data['category']
+                                
+                                # Save confidence score
+                                if result.get('confidence_score') is not None:
+                                    db_receipt.ai_confidence_score = result['confidence_score']
+                                
+                                # Determine final status based on confidence
+                                confidence = result.get('confidence_score', 0)
+                                if confidence >= 0.8:
+                                    db_receipt.status = ReceiptStatus.AWAITING_USER_REVIEW.value
+                                else:
+                                    db_receipt.status = ReceiptStatus.AI_LOW_CONFIDENCE.value
                             else:
-                                db_receipt.status = ReceiptStatus.AI_LOW_CONFIDENCE.value
+                                # Processing failed, but save any successful intermediate results
+                                if result and result.get('s3_url'):
+                                    db_receipt.s3_url = result['s3_url']
+                                if result and result.get('document_ai_result'):
+                                    db_receipt.ocr_raw_text = result['document_ai_result'].get('text', '')
                             
                             db_receipt.updated_at = datetime.now()
                             db.session.commit()
+                            print(f"✅ Database updated for receipt {receipt.id}: S3={bool(db_receipt.s3_url)}, OCR={bool(db_receipt.ocr_raw_text)}, AI={bool(db_receipt.ai_review_json)}")
                     except Exception as db_error:
                         print(f"Final database update error: {db_error}")
                 
@@ -1258,8 +1383,8 @@ def get_processing_progress(session_id):
         'progress_updates': session['progress']
     }
     
-    # Include result if completed
-    if session['status'] == 'completed' and session.get('result'):
+    # Include result if completed or awaiting human review
+    if session['status'] in ['completed', 'awaiting_human_review'] and session.get('result'):
         response_data['result'] = session['result']
     
     # Include error if failed
@@ -1287,6 +1412,77 @@ def list_processing_sessions():
         'active_sessions': sessions_summary,
         'total_sessions': len(active_processing_sessions)
     })
+
+@app.route('/api/receipt/verify', methods=['POST'])
+def verify_receipt():
+    """Handle human verification of receipt data"""
+    try:
+        data = request.get_json()
+        receipt_id = data.get('receipt_id')
+        verified_data = data.get('verified_data', {})
+        
+        if not receipt_id:
+            return jsonify({'error': 'Receipt ID is required'}), 400
+        
+        # Get the receipt from database
+        receipt = Receipt.query.get(receipt_id)
+        if not receipt:
+            return jsonify({'error': 'Receipt not found'}), 404
+        
+        # Update receipt with verified data
+        receipt.vendor_name = verified_data.get('vendor_name')
+        receipt.receipt_date = None
+        if verified_data.get('receipt_date'):
+            try:
+                from datetime import datetime as dt
+                receipt.receipt_date = dt.strptime(verified_data['receipt_date'], '%Y-%m-%d').date()
+            except:
+                pass
+        
+        receipt.location = verified_data.get('location')
+        receipt.payment_method = verified_data.get('payment_method')
+        
+        # Update financial data
+        if verified_data.get('amount_total'):
+            try:
+                receipt.amount_total = float(verified_data['amount_total'])
+            except:
+                pass
+        
+        if verified_data.get('amount_subtotal'):
+            try:
+                receipt.amount_subtotal = float(verified_data['amount_subtotal'])
+            except:
+                pass
+        
+        if verified_data.get('tax_amount'):
+            try:
+                receipt.tax_amount = float(verified_data['tax_amount'])
+            except:
+                pass
+        
+        receipt.currency = verified_data.get('currency')
+        receipt.category = verified_data.get('category')
+        receipt.notes = verified_data.get('notes')
+        
+        # Mark as verified
+        receipt.is_verified = True
+        receipt.status = ReceiptStatus.VERIFIED.value
+        receipt.updated_at = datetime.now()
+        
+        db.session.commit()
+        
+        print(f"✅ Receipt {receipt_id} verified by user")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Receipt verified successfully',
+            'receipt_id': receipt_id
+        })
+        
+    except Exception as e:
+        print(f"❌ Receipt verification error: {str(e)}")
+        return jsonify({'error': f'Verification failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Validate email configuration
