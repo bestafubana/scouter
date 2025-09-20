@@ -1087,15 +1087,56 @@ def process_receipt():
     try:
         data = request.get_json()
         image_data = data.get('image_data')
+        filename = data.get('filename', 'uploaded_receipt.jpg')
         
         if not image_data:
             return jsonify({'error': 'No image data provided'}), 400
         
+        # Get current user (for dev mode, use a default user ID)
+        user_id = None
+        if DEV_MODE:
+            # In dev mode, create or get a test user
+            test_user = User.query.filter_by(email='test@example.com').first()
+            if not test_user:
+                # Create a test user and organization for dev mode
+                test_org = Organization(name='Test Organization')
+                db.session.add(test_org)
+                db.session.commit()
+                
+                test_user = User(
+                    email='test@example.com',
+                    name='Test User',
+                    org_id=test_org.id,
+                    is_admin=True
+                )
+                db.session.add(test_user)
+                db.session.commit()
+            user_id = test_user.id
+        else:
+            # Get user from session in production
+            session_id = request.headers.get('Authorization', '').replace('Bearer ', '')
+            user_data = authenticated_users.get(session_id)
+            if not user_data:
+                return jsonify({'error': 'Authentication required'}), 401
+            user_id = user_data['user_id']
+        
+        # Create Receipt record in database (Step 1 from lifecycle)
+        receipt = Receipt(
+            user_id=user_id,
+            filename=filename,
+            upload_date=datetime.now(),
+            source=ReceiptSource.UPLOAD.value,
+            status=ReceiptStatus.UPLOADED.value
+        )
+        db.session.add(receipt)
+        db.session.commit()
+        
         # Generate processing session ID
         session_id = secrets.token_urlsafe(16)
         
-        # Initialize session
+        # Initialize session with receipt ID
         active_processing_sessions[session_id] = {
+            'receipt_id': str(receipt.id),
             'status': 'started',
             'started_at': datetime.now().isoformat(),
             'progress': [],
@@ -1108,24 +1149,82 @@ def process_receipt():
             asyncio.set_event_loop(loop)
             
             async def progress_callback(update):
-                # Store progress update
+                # Store progress update in session
                 active_processing_sessions[session_id]['progress'].append({
                     **update,
                     'timestamp': datetime.now().isoformat()
                 })
+                
+                # Update database record with progress
+                with app.app_context():
+                    try:
+                        db_receipt = Receipt.query.get(receipt.id)
+                        if db_receipt:
+                            # Update status based on step
+                            step = update.get('step', '')
+                            if 's3' in step.lower():
+                                db_receipt.status = ReceiptStatus.UPLOADED.value
+                                if update.get('completed') and update.get('result', {}).get('s3_url'):
+                                    db_receipt.s3_url = update['result']['s3_url']
+                            elif 'ocr' in step.lower() or 'document' in step.lower():
+                                if update.get('completed'):
+                                    db_receipt.status = ReceiptStatus.OCR_DONE.value
+                                    if update.get('result', {}).get('text'):
+                                        db_receipt.ocr_raw_text = update['result']['text']
+                            elif 'ai' in step.lower() or 'gpt' in step.lower():
+                                if update.get('completed'):
+                                    db_receipt.status = ReceiptStatus.AI_DONE.value
+                                    if update.get('result', {}).get('confidence_score'):
+                                        db_receipt.ai_confidence_score = update['result']['confidence_score']
+                                    if update.get('result', {}).get('structured_data'):
+                                        db_receipt.ai_review_json = update['result']['structured_data']
+                                        db_receipt.ai_reviewed_at = datetime.now()
+                            
+                            db_receipt.updated_at = datetime.now()
+                            db.session.commit()
+                    except Exception as db_error:
+                        print(f"Database update error: {db_error}")
             
             try:
                 result = loop.run_until_complete(
-                    receipt_processor.process_receipt(image_data, progress_callback)
+                    receipt_processor.process_receipt(image_data, progress_callback, receipt_id=str(receipt.id))
                 )
                 
-                # Store final result
+                # Store final result and update database
                 active_processing_sessions[session_id]['result'] = result
                 active_processing_sessions[session_id]['status'] = 'completed'
+                
+                # Final database update
+                with app.app_context():
+                    try:
+                        db_receipt = Receipt.query.get(receipt.id)
+                        if db_receipt and result:
+                            # Determine final status based on confidence
+                            confidence = result.get('confidence_score', 0)
+                            if confidence >= 0.8:
+                                db_receipt.status = ReceiptStatus.AWAITING_USER_REVIEW.value
+                            else:
+                                db_receipt.status = ReceiptStatus.AI_LOW_CONFIDENCE.value
+                            
+                            db_receipt.updated_at = datetime.now()
+                            db.session.commit()
+                    except Exception as db_error:
+                        print(f"Final database update error: {db_error}")
                 
             except Exception as e:
                 active_processing_sessions[session_id]['status'] = 'error'
                 active_processing_sessions[session_id]['error'] = str(e)
+                
+                # Update database with error
+                with app.app_context():
+                    try:
+                        db_receipt = Receipt.query.get(receipt.id)
+                        if db_receipt:
+                            db_receipt.status = ReceiptStatus.UPLOADED.value  # Reset to uploaded on error
+                            db_receipt.updated_at = datetime.now()
+                            db.session.commit()
+                    except Exception as db_error:
+                        print(f"Error database update error: {db_error}")
             finally:
                 loop.close()
         
@@ -1136,6 +1235,7 @@ def process_receipt():
         
         return jsonify({
             'session_id': session_id,
+            'receipt_id': str(receipt.id),
             'status': 'processing_started',
             'message': 'Receipt processing started. Use the session_id to check progress.'
         })

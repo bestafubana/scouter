@@ -758,13 +758,14 @@ class ReceiptProcessor:
             )
         ]
     
-    async def process_receipt(self, image_data: str, progress_callback: Callable = None) -> Dict[str, Any]:
+    async def process_receipt(self, image_data: str, progress_callback: Callable = None, receipt_id: str = None) -> Dict[str, Any]:
         """
         Full receipt processing pipeline with real-time progress updates
         
         Args:
             image_data: Base64 encoded image data
             progress_callback: Optional callback function for progress updates
+            receipt_id: Database receipt ID for tracking progress
             
         Returns:
             Complete processing results with structured data
