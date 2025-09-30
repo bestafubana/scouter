@@ -771,6 +771,13 @@ def health_check_api():
         'authenticated_users': len(authenticated_users)
     })
 
+@app.route('/metrics')
+def metrics_endpoint():
+    """Prometheus metrics endpoint - Open for scraping"""
+    from metrics import get_metrics
+    metrics_data, content_type = get_metrics()
+    return metrics_data, 200, {'Content-Type': content_type}
+
 @app.route('/health')
 @require_admin_page
 def health_check_page():

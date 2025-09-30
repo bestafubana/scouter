@@ -737,7 +737,7 @@
                                             </div>
                                             <!-- Step Label -->
                                             <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 whitespace-nowrap font-medium">
-                                                <span x-text="step.name.replace('Upload to ', '').replace('Google Document ', '').replace('GPT ', '').replace('Data ', '')"></span>
+                                                <span x-text="step.name"></span>
                                             </div>
                                         </div>
                                         
@@ -822,13 +822,81 @@
                         </div>
                     </div>
                     
-                    <!-- Filters Placeholder -->
-                    <div class="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                        <div class="flex items-center justify-center text-gray-500">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
-                            </svg>
-                            <span class="text-sm font-medium">Filters will be added here</span>
+                    <!-- Filters -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <!-- Free Text Search -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                                <input type="text" id="searchInput" placeholder="Vendor name or items..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onkeyup="scouter.applyFilters()">
+                            </div>
+                            
+                            <!-- Date Range -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                                    <input type="date" id="dateFrom" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="scouter.applyFilters()">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                                    <input type="date" id="dateTo" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="scouter.applyFilters()">
+                                </div>
+                            </div>
+                            
+                            <!-- Amount Range -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Min Amount</label>
+                                    <input type="number" id="amountMin" placeholder="0.00" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="scouter.applyFilters()">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Max Amount</label>
+                                    <input type="number" id="amountMax" placeholder="999999" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="scouter.applyFilters()">
+                                </div>
+                            </div>
+                            
+                            <!-- Tax Range -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Min Tax</label>
+                                    <input type="number" id="taxMin" placeholder="0.00" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="scouter.applyFilters()">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Max Tax</label>
+                                    <input type="number" id="taxMax" placeholder="999999" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" onchange="scouter.applyFilters()">
+                                </div>
+                            </div>
+                            
+                            <!-- Clear Filters Button -->
+                            <div class="flex items-end">
+                                <button onclick="scouter.clearFilters()" class="w-full px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm transition-colors">
+                                    Clear Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-600">Show</span>
+                            <select id="itemsPerPage" class="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="scouter.changeItemsPerPage()">
+                                <option value="10">10</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                            </select>
+                            <span class="text-sm text-gray-600">per page</span>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <button id="prevPage" onclick="scouter.previousPage()" class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                Previous
+                            </button>
+                            <span id="pageInfo" class="text-sm text-gray-600">Page 1 of 1</span>
+                            <button id="nextPage" onclick="scouter.nextPage()" class="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                Next
+                            </button>
                         </div>
                     </div>
                     
@@ -1021,7 +1089,7 @@
                             <!-- Raw Data Tab -->
                             <div x-show="activeTab === 'raw'" class="space-y-4">
                                 <div class="bg-gray-50 rounded-lg p-4">
-                                    <h4 class="font-semibold text-gray-800 mb-3">GPT Extracted Data (JSON)</h4>
+                                    <h4 class="font-semibold text-gray-800 mb-3">AI Extracted Data (JSON)</h4>
                                     <pre class="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto" x-text="JSON.stringify(reviewData.rawAiData || {}, null, 2)"></pre>
                                 </div>
                                 <div class="bg-blue-50 rounded-lg p-4">
@@ -1121,7 +1189,7 @@
                             <!-- Final Raw Data Tab -->
                             <div x-show="activeTab === 'raw'" class="space-y-4">
                                 <div class="bg-gray-50 rounded-lg p-4">
-                                    <h4 class="font-semibold text-gray-800 mb-3">GPT Extracted Data (JSON)</h4>
+                                    <h4 class="font-semibold text-gray-800 mb-3">AI Extracted Data (JSON)</h4>
                                     <pre class="text-sm text-gray-700 whitespace-pre-wrap overflow-x-auto" x-text="JSON.stringify(reviewData.rawAiData || {}, null, 2)"></pre>
                                 </div>
                             </div>
@@ -1890,14 +1958,14 @@
                     const errorDetails = [];
                     
                     // Analyze the error and provide helpful details
-                    if (result.error.includes('OpenAI') || result.error.includes('JSON')) {
-                        errorDetails.push('AI processing failed - unable to extract receipt data');
+                    if (result.error.includes('AI') || result.error.includes('JSON') || result.error.includes('analysis')) {
+                        errorDetails.push('AI analysis failed - unable to extract receipt data');
                         errorDetails.push('This may be due to poor image quality or unreadable text');
                     }
-                    if (result.error.includes('Document AI')) {
-                        errorDetails.push('OCR processing failed - unable to read text from image');
+                    if (result.error.includes('recognition') || result.error.includes('OCR')) {
+                        errorDetails.push('Image recognition failed - unable to read text from image');
                     }
-                    if (result.error.includes('S3')) {
+                    if (result.error.includes('upload') || result.error.includes('image storage')) {
                         errorDetails.push('Image upload failed - check your internet connection');
                     }
                     
@@ -2054,27 +2122,137 @@
                     const response = await fetch('/api/receipts');
                     if (response.ok) {
                         const data = await response.json();
-                        this.updateReceiptsTable(data.receipts);
+                        this.allReceipts = data.receipts; // Store all receipts
+                        this.currentPage = 1;
+                        this.itemsPerPage = 50;
+                        this.applyFilters();
                     } else {
                         console.error('Failed to load receipts:', response.statusText);
+                        this.allReceipts = [];
                         this.updateReceiptsTable([]);
                     }
                 } catch (error) {
                     console.error('Error loading receipts:', error);
+                    this.allReceipts = [];
                     this.updateReceiptsTable([]);
                 }
             }
             
-            updateReceiptsTable(receipts = []) {
+            applyFilters() {
+                if (!this.allReceipts) return;
+                
+                const searchText = document.getElementById('searchInput')?.value.toLowerCase() || '';
+                const dateFrom = document.getElementById('dateFrom')?.value || '';
+                const dateTo = document.getElementById('dateTo')?.value || '';
+                const amountMin = parseFloat(document.getElementById('amountMin')?.value) || null;
+                const amountMax = parseFloat(document.getElementById('amountMax')?.value) || null;
+                const taxMin = parseFloat(document.getElementById('taxMin')?.value) || null;
+                const taxMax = parseFloat(document.getElementById('taxMax')?.value) || null;
+                
+                this.filteredReceipts = this.allReceipts.filter(receipt => {
+                    // Free text search (vendor name or items in JSON)
+                    if (searchText) {
+                        const vendor = (receipt.vendor_name || '').toLowerCase();
+                        const jsonData = JSON.stringify(receipt.ai_result || {}).toLowerCase();
+                        if (!vendor.includes(searchText) && !jsonData.includes(searchText)) {
+                            return false;
+                        }
+                    }
+                    
+                    // Date range filter
+                    if (dateFrom && receipt.receipt_date) {
+                        if (receipt.receipt_date < dateFrom) return false;
+                    }
+                    if (dateTo && receipt.receipt_date) {
+                        if (receipt.receipt_date > dateTo) return false;
+                    }
+                    
+                    // Amount range filter
+                    const amount = parseFloat(receipt.amount_total) || 0;
+                    if (amountMin !== null && amount < amountMin) return false;
+                    if (amountMax !== null && amount > amountMax) return false;
+                    
+                    // Tax range filter
+                    const tax = parseFloat(receipt.tax_amount) || 0;
+                    if (taxMin !== null && tax < taxMin) return false;
+                    if (taxMax !== null && tax > taxMax) return false;
+                    
+                    return true;
+                });
+                
+                this.currentPage = 1; // Reset to first page
+                this.updateReceiptsTable();
+            }
+            
+            clearFilters() {
+                document.getElementById('searchInput').value = '';
+                document.getElementById('dateFrom').value = '';
+                document.getElementById('dateTo').value = '';
+                document.getElementById('amountMin').value = '';
+                document.getElementById('amountMax').value = '';
+                document.getElementById('taxMin').value = '';
+                document.getElementById('taxMax').value = '';
+                this.applyFilters();
+            }
+            
+            changeItemsPerPage() {
+                this.itemsPerPage = parseInt(document.getElementById('itemsPerPage').value);
+                this.currentPage = 1;
+                this.updateReceiptsTable();
+            }
+            
+            previousPage() {
+                if (this.currentPage > 1) {
+                    this.currentPage--;
+                    this.updateReceiptsTable();
+                }
+            }
+            
+            nextPage() {
+                const totalPages = Math.ceil((this.filteredReceipts || []).length / this.itemsPerPage);
+                if (this.currentPage < totalPages) {
+                    this.currentPage++;
+                    this.updateReceiptsTable();
+                }
+            }
+            
+            updateReceiptsTable() {
                 const tableBody = document.getElementById('receiptsTableBody');
                 const receiptsCount = document.getElementById('receiptsCount');
+                const pageInfo = document.getElementById('pageInfo');
+                const prevBtn = document.getElementById('prevPage');
+                const nextBtn = document.getElementById('nextPage');
                 
-                if (!tableBody || !receiptsCount) return;
+                if (!tableBody) return;
                 
-                // Update count
-                receiptsCount.textContent = receipts.length;
+                const receipts = this.filteredReceipts || [];
+                const totalReceipts = receipts.length;
+                const totalPages = Math.ceil(totalReceipts / this.itemsPerPage) || 1;
                 
-                if (receipts.length === 0) {
+                // Update total count
+                if (receiptsCount) {
+                    receiptsCount.textContent = totalReceipts;
+                }
+                
+                // Update pagination info
+                if (pageInfo) {
+                    pageInfo.textContent = `Page ${this.currentPage} of ${totalPages}`;
+                }
+                
+                // Update pagination buttons
+                if (prevBtn) {
+                    prevBtn.disabled = this.currentPage === 1;
+                }
+                if (nextBtn) {
+                    nextBtn.disabled = this.currentPage >= totalPages;
+                }
+                
+                // Calculate start and end indices for current page
+                const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+                const endIndex = Math.min(startIndex + this.itemsPerPage, totalReceipts);
+                const pageReceipts = receipts.slice(startIndex, endIndex);
+                
+                if (pageReceipts.length === 0) {
                     // Show empty state
                     tableBody.innerHTML = `
                         <tr class="border-b border-gray-100">
@@ -2083,15 +2261,15 @@
                                     <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                     </svg>
-                                    <p class="text-lg font-medium">No receipts yet</p>
-                                    <p class="text-sm">Upload your first receipt to get started</p>
+                                    <p class="text-lg font-medium">No receipts found</p>
+                                    <p class="text-sm">${totalReceipts === 0 && this.allReceipts.length > 0 ? 'Try adjusting your filters' : 'Upload your first receipt to get started'}</p>
                                 </div>
                             </td>
                         </tr>
                     `;
                 } else {
                     // Show receipts
-                    tableBody.innerHTML = receipts.map(receipt => {
+                    tableBody.innerHTML = pageReceipts.map(receipt => {
                         const receiptDate = receipt.receipt_date ? new Date(receipt.receipt_date).toISOString().split('T')[0] : 'N/A';
                         const uploadTime = new Date(receipt.upload_date).toLocaleTimeString('en-US', { 
                             hour12: false, 
@@ -2099,8 +2277,8 @@
                             minute: '2-digit' 
                         });
                         const vendor = receipt.vendor_name || 'Unknown Vendor';
-                        const amount = receipt.amount_total ? `$${receipt.amount_total}` : '$0.00';
-                        const tax = receipt.tax_amount ? `$${receipt.tax_amount}` : '$0.00';
+                        const amount = receipt.amount_total ? `$${parseFloat(receipt.amount_total).toFixed(2)}` : '$0.00';
+                        const tax = receipt.tax_amount ? `$${parseFloat(receipt.tax_amount).toFixed(2)}` : '$0.00';
                         
                         return `
                             <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">

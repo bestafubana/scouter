@@ -10,6 +10,8 @@ Scouter is a standalone receipt processing system with magic link authentication
   - [Quick Start](#quick-start)
     - [1. Setup Environment](#1-setup-environment)
     - [2. Setup Google Cloud (Optional)](#2-setup-google-cloud-optional)
+      - [**Step-by-Step Google Cloud Setup:**](#step-by-step-google-cloud-setup)
+      - [**Authentication Methods:**](#authentication-methods)
     - [3. Start MailHog (Email Testing)](#3-start-mailhog-email-testing)
     - [4. Start Scouter](#4-start-scouter)
     - [5. Access Scouter](#5-access-scouter)
@@ -23,16 +25,46 @@ Scouter is a standalone receipt processing system with magic link authentication
     - [Testing New User Registration](#testing-new-user-registration)
   - [Development Setup](#development-setup)
     - [Email Testing with MailHog](#email-testing-with-mailhog)
+    - [Development Mode](#development-mode)
     - [Database Management](#database-management)
+  - [Development Guidelines](#development-guidelines)
+    - [⚠️ Critical: Always Check Existing Infrastructure First](#️-critical-always-check-existing-infrastructure-first)
+    - [🚫 Common Mistakes to Avoid](#-common-mistakes-to-avoid)
+      - [**DO NOT use localStorage for data that belongs in the database**](#do-not-use-localstorage-for-data-that-belongs-in-the-database)
+      - [**DO NOT ignore existing authentication system**](#do-not-ignore-existing-authentication-system)
+      - [**DO NOT bypass user/organization tracking**](#do-not-bypass-userorganization-tracking)
+    - [🎯 Best Practices](#-best-practices)
+      - [**1. User and Receipt Management**](#1-user-and-receipt-management)
+      - [**2. Authentication Flow**](#2-authentication-flow)
+      - [**3. Frontend Development**](#3-frontend-development)
+      - [**4. API Development**](#4-api-development)
+      - [**5. Generic Naming Convention**](#5-generic-naming-convention)
+    - [📚 Key Files Reference](#-key-files-reference)
+    - [🔍 Quick Checklist Before Coding](#-quick-checklist-before-coding)
   - [Receipt Processing Pipeline](#receipt-processing-pipeline)
     - [🔄 Processing Flow](#-processing-flow)
+      - [Processing Steps:](#processing-steps)
     - [📊 Real-time Progress](#-real-time-progress)
     - [🎯 Key Features](#-key-features)
     - [📋 Receipt Record Lifecycle](#-receipt-record-lifecycle)
+      - [1. **Create Receipt Record** (Before Upload)](#1-create-receipt-record-before-upload)
+      - [2. **Upload Image to S3**](#2-upload-image-to-s3)
+      - [3. **Run OCR** (Google Document AI)](#3-run-ocr-google-document-ai)
+      - [4. **Extract Structured Fields** (via GPT)](#4-extract-structured-fields-via-gpt)
+      - [5. **Update Key Fields from AI Output**](#5-update-key-fields-from-ai-output)
+      - [6. **Finalize / Ready for Review**](#6-finalize--ready-for-review)
+      - [Status Values:](#status-values)
     - [🔧 Configuration](#-configuration)
+      - [🔑 **AWS S3 Configuration**](#-aws-s3-configuration)
+      - [🤖 **OpenAI Configuration**](#-openai-configuration)
+      - [🔍 **Google Document AI Configuration**](#-google-document-ai-configuration)
+      - [⚙️ **Processing Settings**](#️-processing-settings)
   - [API Documentation](#api-documentation)
   - [API Endpoints](#api-endpoints)
     - [Authentication Endpoints](#authentication-endpoints)
+    - [Receipt Processing Endpoints](#receipt-processing-endpoints)
+      - [GET `/api/receipts`](#get-apireceipts)
+      - [POST `/api/receipt/verify`](#post-apireceiptverify)
     - [Frontend Endpoints](#frontend-endpoints)
   - [Email Configuration](#email-configuration)
     - [Development (MailHog)](#development-mailhog)
@@ -42,6 +74,20 @@ Scouter is a standalone receipt processing system with magic link authentication
     - [Production (PostgreSQL)](#production-postgresql)
   - [Security Features](#security-features)
   - [File Structure](#file-structure)
+  - [Performance Monitoring with Prometheus \& Grafana](#performance-monitoring-with-prometheus--grafana)
+    - [📊 Available Metrics](#-available-metrics)
+      - [**Overall Pipeline Metrics**](#overall-pipeline-metrics)
+      - [**Per-Step Performance**](#per-step-performance)
+      - [**Quality Metrics**](#quality-metrics)
+      - [**Cost Tracking**](#cost-tracking)
+      - [**Additional Metrics**](#additional-metrics)
+    - [🚀 Quick Start with Prometheus](#-quick-start-with-prometheus)
+    - [📈 Quick Start with Grafana](#-quick-start-with-grafana)
+    - [📊 Sample Grafana Dashboard JSON](#-sample-grafana-dashboard-json)
+    - [🔍 Useful Prometheus Queries](#-useful-prometheus-queries)
+    - [🎯 Recommended Alerts](#-recommended-alerts)
+    - [📝 Testing Metrics](#-testing-metrics)
+    - [🎨 Grafana Dashboard Tips](#-grafana-dashboard-tips)
   - [Troubleshooting](#troubleshooting)
     - [Email Issues](#email-issues)
     - [Database Issues](#database-issues)
@@ -50,6 +96,9 @@ Scouter is a standalone receipt processing system with magic link authentication
     - [Google Document AI Issues](#google-document-ai-issues)
   - [Production Deployment](#production-deployment)
     - [AWS Deployment (Recommended)](#aws-deployment-recommended)
+      - [🔐 **Google Cloud Credentials on AWS**](#-google-cloud-credentials-on-aws)
+      - [🚀 **AWS Deployment Options**](#-aws-deployment-options)
+      - [🔒 **Security Best Practices for AWS**](#-security-best-practices-for-aws)
     - [Environment Variables](#environment-variables)
     - [Deployment Checklist](#deployment-checklist)
 
@@ -271,6 +320,177 @@ flask db upgrade
 python seed_data.py
 ```
 
+## Development Guidelines
+
+### ⚠️ Critical: Always Check Existing Infrastructure First
+
+**Before implementing ANY new feature, ALWAYS check if infrastructure already exists:**
+
+1. **Check `models.py`** - Look for existing database models before creating new ones
+2. **Check `auth_server.py`** - Look for existing API endpoints before creating new ones
+3. **Check `README.md`** - Review architecture and existing features
+4. **Use existing patterns** - Follow the established code structure
+
+### 🚫 Common Mistakes to Avoid
+
+#### **DO NOT use localStorage for data that belongs in the database**
+
+❌ **Wrong:**
+```javascript
+// Storing receipts in localStorage
+localStorage.setItem('receipts', JSON.stringify(receipts));
+```
+
+✅ **Correct:**
+```javascript
+// Use existing API and database
+const response = await fetch('/api/receipts');
+const data = await response.json();
+```
+
+**Why:** Scouter has a complete database system with SQLAlchemy models. Always use:
+- Database models (in `models.py`)
+- API endpoints (in `auth_server.py`)
+- Proper authentication and user tracking
+
+#### **DO NOT ignore existing authentication system**
+
+❌ **Wrong:**
+```python
+# Creating custom session management
+user_id = request.headers.get('user-id')
+```
+
+✅ **Correct:**
+```python
+# Use Flask session (configured in auth_server.py)
+user_id = session.get('user_id')
+if not user_id:
+    return jsonify({'error': 'Not authenticated'}), 401
+```
+
+#### **DO NOT bypass user/organization tracking**
+
+❌ **Wrong:**
+```python
+# Using test data for all users
+user_id = 'test@example.com'
+```
+
+✅ **Correct:**
+```python
+# Use authenticated user's UUID
+user_id = session.get('user_id')
+user = User.query.filter_by(uuid=user_id).first()
+# Save with user.uuid for proper multi-tenant support
+```
+
+### 🎯 Best Practices
+
+#### **1. User and Receipt Management**
+
+- **Users are identified by UUID** (not integer ID)
+- **Receipts belong to users** via `user_id` (UUID foreign key)
+- **Organizations are tracked** via `org_id` in User model
+- **Always filter by authenticated user** when querying receipts
+
+```python
+# Correct way to get user's receipts
+user_id = session.get('user_id')
+receipts = Receipt.query.filter_by(
+    user_id=user_id,
+    is_deleted=False
+).order_by(Receipt.created_at.desc()).all()
+```
+
+#### **2. Authentication Flow**
+
+- **Session storage:** Flask session stores `user_id` (UUID)
+- **Dual storage:** Also stored in `authenticated_users` dict for Bearer token support
+- **SECRET_KEY required:** Flask session needs `app.config['SECRET_KEY']`
+- **Both login and registration** must set session data
+
+```python
+# Correct authentication setup
+session['user_id'] = user.uuid
+session['email'] = user.email
+session['name'] = user.name
+```
+
+#### **3. Frontend Development**
+
+- **Use existing Scouter class** - Don't create parallel state management
+- **Alpine.js for reactivity** - Already integrated for progress tracking
+- **Client-side filtering** - Filter/paginate data received from API
+- **Respect existing DOM structure** - Don't arbitrarily move elements (breaks Alpine.js)
+
+```javascript
+// Correct: Store all data, filter client-side
+this.allReceipts = data.receipts;
+this.filteredReceipts = this.allReceipts.filter(/* filters */);
+```
+
+#### **4. API Development**
+
+- **Check for existing endpoints** before creating new ones
+- **Use consistent patterns** with existing API structure
+- **Return proper error codes** (401 for auth, 404 for not found, etc.)
+- **Include authentication checks** on all protected endpoints
+
+```python
+# Standard API pattern
+@app.route('/api/receipts', methods=['GET'])
+def list_receipts():
+    # 1. Check authentication
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # 2. Query database with user filter
+    receipts = Receipt.query.filter_by(
+        user_id=user_id,
+        is_deleted=False
+    ).all()
+    
+    # 3. Return structured response
+    return jsonify({
+        'receipts': [r.to_dict() for r in receipts],
+        'total': len(receipts)
+    })
+```
+
+#### **5. Generic Naming Convention**
+
+**DO NOT expose internal technology stack in user-facing text:**
+
+❌ **Avoid:** "S3 Upload Failed", "Google Document AI Error", "GPT Processing"
+
+✅ **Use:** "Image Upload Failed", "Image Recognition Error", "AI Analysis"
+
+**Why:** Technology choices may change, and users don't need to know implementation details.
+
+### 📚 Key Files Reference
+
+| File | Purpose | When to Check |
+|------|---------|--------------|
+| `models.py` | Database models (User, Receipt, Organization) | Before adding any data storage |
+| `auth_server.py` | API endpoints and authentication | Before adding any API routes |
+| `index.html` | Frontend application (Scouter class) | Before adding UI features |
+| `README.md` | Architecture and API docs | Start here for any feature |
+| `seed_data.py` | Test data structure | To understand data relationships |
+
+### 🔍 Quick Checklist Before Coding
+
+- [ ] Read relevant sections of README.md
+- [ ] Check if database model exists in models.py
+- [ ] Check if API endpoint exists in auth_server.py
+- [ ] Review existing frontend patterns in index.html
+- [ ] Verify authentication is properly implemented
+- [ ] Use UUIDs (not integer IDs) for user references
+- [ ] Filter data by authenticated user
+- [ ] Use generic terminology (not AWS/Google/OpenAI)
+- [ ] Test with actual user login flow
+
 ## Receipt Processing Pipeline
 
 Scouter features an advanced receipt processing system with real-time progress tracking:
@@ -477,7 +697,87 @@ Scouter provides comprehensive API documentation using Redocly. The interactive 
 |----------|--------|-------------|
 | `/api/receipt/process` | POST | Start receipt processing with real-time progress |
 | `/api/receipt/progress/<session_id>` | GET | Get processing progress for a session |
+| `/api/receipt/verify` | POST | Verify and save receipt data after human review |
+| `/api/receipts` | GET | List all receipts for authenticated user |
 | `/api/receipt/sessions` | GET | List active processing sessions (dev mode only) |
+
+#### GET `/api/receipts`
+
+Lists all receipts for the authenticated user.
+
+**Authentication:** Required (session-based)
+
+**Response:**
+```json
+{
+  "receipts": [
+    {
+      "id": "uuid",
+      "vendor_name": "Store Name",
+      "receipt_date": "2025-09-30",
+      "amount_total": 25.99,
+      "amount_subtotal": 23.84,
+      "tax_amount": 2.15,
+      "currency": "USD",
+      "category": "Groceries",
+      "payment_method": "Credit Card",
+      "location": "123 Main St",
+      "upload_date": "2025-09-30T12:00:00",
+      "status": "verified",
+      "is_verified": true,
+      "ai_result": { ... },
+      "s3_url": "https://...",
+      "document_ai_result": { ... }
+    }
+  ],
+  "total": 42
+}
+```
+
+**Features:**
+- Returns receipts filtered by authenticated user
+- Excludes deleted receipts (`is_deleted = False`)
+- Orders by creation date (newest first)
+- Includes full receipt data with AI analysis results
+
+**Usage in Frontend:**
+The frontend implements client-side filtering and pagination with:
+- Free text search (vendor name and JSON data)
+- Date range filtering
+- Amount range filtering
+- Tax amount range filtering
+- Pagination (50/100/200 items per page)
+
+#### POST `/api/receipt/verify`
+
+Verifies and saves receipt data after human review.
+
+**Authentication:** Required (session-based)
+
+**Request Body:**
+```json
+{
+  "receipt_id": "uuid",
+  "verified_data": {
+    "vendor_name": "Store Name",
+    "receipt_date": "2025-09-30",
+    "amount_total": 25.99,
+    "tax_amount": 2.15,
+    "currency": "USD",
+    "category": "Groceries",
+    "notes": "Optional notes"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Receipt verified successfully",
+  "receipt_id": "uuid"
+}
+```
 
 ### Frontend Endpoints
 
@@ -558,6 +858,255 @@ scouter/
 ├── scouter.db                 # SQLite database (development)
 └── README.md                  # This documentation
 ```
+
+## Performance Monitoring with Prometheus & Grafana
+
+Scouter includes built-in Prometheus metrics for monitoring receipt processing performance, costs, and quality.
+
+### 📊 Available Metrics
+
+#### **Overall Pipeline Metrics**
+- `receipt_processing_duration_seconds` - Total end-to-end processing time (histogram)
+- `receipt_processing_success_total` - Successfully processed receipts (counter)
+- `receipt_processing_failed_total{step}` - Failed receipts by step (counter)
+- `receipt_processing_in_progress` - Currently processing receipts (gauge)
+
+#### **Per-Step Performance**
+- `receipt_step_duration_seconds{step}` - Duration of each step: upload, ocr, ai, validation (histogram)
+
+#### **Quality Metrics**
+- `receipt_confidence_score` - AI confidence scores (histogram, 0-1.0)
+- `receipt_human_review_required_total` - Receipts needing human review (counter)
+
+#### **Cost Tracking**
+- `receipt_ai_tokens_used_total{token_type}` - OpenAI tokens consumed (counter)
+- `receipt_ai_cost_estimate_usd` - Estimated OpenAI API costs (counter)
+
+#### **Additional Metrics**
+- `receipt_upload_size_bytes` - Receipt image sizes (histogram)
+- `receipt_verification_duration_seconds` - User verification time (histogram)
+
+### 🚀 Quick Start with Prometheus
+
+**1. Install Prometheus:**
+```bash
+# macOS
+brew install prometheus
+
+# Linux
+wget https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz
+tar xvfz prometheus-*.tar.gz
+cd prometheus-*
+```
+
+**2. Create Prometheus Configuration:**
+```bash
+cat > prometheus.yml <<EOF
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'scouter'
+    static_configs:
+      - targets: ['localhost:5001']
+    metrics_path: '/metrics'
+EOF
+```
+
+**3. Start Prometheus:**
+```bash
+prometheus --config.file=prometheus.yml
+```
+
+**4. Access Prometheus UI:**
+```
+http://localhost:9090
+```
+
+### 📈 Quick Start with Grafana
+
+**1. Install Grafana:**
+```bash
+# macOS
+brew install grafana
+brew services start grafana
+
+# Linux
+sudo apt-get install -y grafana
+sudo systemctl start grafana-server
+```
+
+**2. Access Grafana:**
+```
+http://localhost:3000
+Default credentials: admin/admin
+```
+
+**3. Add Prometheus Data Source:**
+- Click "Configuration" → "Data Sources" → "Add data source"
+- Select "Prometheus"
+- URL: `http://localhost:9090`
+- Click "Save & Test"
+
+**4. Create Dashboard:**
+
+Use these sample queries:
+
+**Processing Time (P95):**
+```promql
+histogram_quantile(0.95, rate(receipt_processing_duration_seconds_bucket[5m]))
+```
+
+**Success Rate:**
+```promql
+rate(receipt_processing_success_total[5m]) / (rate(receipt_processing_success_total[5m]) + rate(receipt_processing_failed_total[5m]))
+```
+
+**Throughput (receipts/minute):**
+```promql
+rate(receipt_processing_success_total[1m]) * 60
+```
+
+**Step Duration Breakdown:**
+```promql
+sum by (step) (rate(receipt_step_duration_seconds_sum[5m])) / sum by (step) (rate(receipt_step_duration_seconds_count[5m]))
+```
+
+**AI Cost per Hour:**
+```promql
+rate(receipt_ai_cost_estimate_usd[1h])
+```
+
+**Average Confidence Score:**
+```promql
+avg(receipt_confidence_score)
+```
+
+**Concurrent Processing:**
+```promql
+receipt_processing_in_progress
+```
+
+### 📊 Sample Grafana Dashboard JSON
+
+Create a new dashboard and import this configuration:
+
+```json
+{
+  "dashboard": {
+    "title": "Scouter Receipt Processing",
+    "panels": [
+      {
+        "title": "Processing Duration (P50, P95, P99)",
+        "targets": [{
+          "expr": "histogram_quantile(0.50, rate(receipt_processing_duration_seconds_bucket[5m]))",
+          "legendFormat": "P50"
+        }]
+      },
+      {
+        "title": "Success vs Failed Receipts",
+        "targets": [{
+          "expr": "rate(receipt_processing_success_total[5m])",
+          "legendFormat": "Success"
+        }, {
+          "expr": "rate(receipt_processing_failed_total[5m])",
+          "legendFormat": "Failed"
+        }]
+      },
+      {
+        "title": "Step Duration Breakdown",
+        "targets": [{
+          "expr": "rate(receipt_step_duration_seconds_sum[5m]) / rate(receipt_step_duration_seconds_count[5m])",
+          "legendFormat": "{{step}}"
+        }]
+      }
+    ]
+  }
+}
+```
+
+### 🔍 Useful Prometheus Queries
+
+**Find Slowest Step:**
+```promql
+topk(1, sum by (step) (rate(receipt_step_duration_seconds_sum[5m])) / sum by (step) (rate(receipt_step_duration_seconds_count[5m])))
+```
+
+**Failure Rate by Step:**
+```promql
+sum by (step) (rate(receipt_processing_failed_total[5m]))
+```
+
+**Daily Token Usage:**
+```promql
+increase(receipt_ai_tokens_used_total[24h])
+```
+
+**Low Confidence Rate:**
+```promql
+rate(receipt_human_review_required_total[1h]) / rate(receipt_processing_success_total[1h])
+```
+
+### 🎯 Recommended Alerts
+
+Create these alerts in Prometheus `rules.yml`:
+
+```yaml
+groups:
+  - name: scouter_alerts
+    rules:
+      - alert: HighFailureRate
+        expr: rate(receipt_processing_failed_total[5m]) > 0.1
+        for: 5m
+        annotations:
+          summary: "High receipt processing failure rate"
+          
+      - alert: SlowProcessing
+        expr: histogram_quantile(0.95, rate(receipt_processing_duration_seconds_bucket[5m])) > 60
+        for: 10m
+        annotations:
+          summary: "Receipt processing is taking > 60 seconds (P95)"
+          
+      - alert: HighAICost
+        expr: rate(receipt_ai_cost_estimate_usd[1h]) > 10
+        for: 1h
+        annotations:
+          summary: "AI costs exceeding $10/hour"
+```
+
+### 📝 Testing Metrics
+
+**1. View Raw Metrics:**
+```bash
+curl http://localhost:5001/metrics
+```
+
+**2. Process a Test Receipt:**
+- Upload a receipt through the UI
+- Check metrics update in real-time
+
+**3. Query Metrics in Prometheus:**
+- Go to `http://localhost:9090/graph`
+- Enter metric name (e.g., `receipt_processing_duration_seconds`)
+- Click "Execute" and "Graph"
+
+### 🎨 Grafana Dashboard Tips
+
+1. **Create Rows** for different metric categories:
+   - Performance (duration, throughput)
+   - Quality (confidence, human review rate)
+   - Costs (tokens, API costs)
+   - System Health (errors, concurrent processing)
+
+2. **Use Variables** for dynamic filtering:
+   - Step name (upload, ocr, ai, validation)
+   - Time range
+   - Percentile (P50, P95, P99)
+
+3. **Set Up Alerts** in Grafana:
+   - Notification channels (Slack, email, PagerDuty)
+   - Alert rules based on thresholds
+   - Alert history and acknowledgment
 
 ## Troubleshooting
 

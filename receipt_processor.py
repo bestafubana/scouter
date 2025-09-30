@@ -16,6 +16,20 @@ from datetime import datetime
 from io import BytesIO
 import tempfile
 
+# Import Prometheus metrics
+from metrics import (
+    receipt_processing_duration,
+    receipt_processing_success_total,
+    receipt_processing_failed_total,
+    receipt_processing_in_progress,
+    receipt_step_duration,
+    receipt_confidence_score,
+    receipt_ai_tokens_used,
+    receipt_ai_cost_estimate,
+    receipt_upload_size_bytes,
+    receipt_human_review_required
+)
+
 # Third-party imports (will be added to requirements.txt)
 try:
     import boto3
@@ -817,11 +831,24 @@ class ReceiptProcessor:
         processing_id = str(uuid.uuid4())
         start_time = datetime.now()
         
+        # Prometheus: Track concurrent processing
+        receipt_processing_in_progress.inc()
+        
+        # Track individual step times
+        step_times = {}
+        
         try:
             # Step 1: Upload to S3
             await self._update_step("upload", "processing", 10, "Uploading image to S3...", progress_callback)
             
+            step_start = time.time()
             upload_result = await self.s3_uploader.upload_image(image_data)
+            step_times['upload'] = time.time() - step_start
+            
+            # Prometheus: Record upload metrics
+            receipt_step_duration.labels(step='upload').observe(step_times['upload'])
+            if upload_result.get('size'):
+                receipt_upload_size_bytes.observe(upload_result['size'])
             
             if not upload_result['success']:
                 await self._update_step("upload", "error", 0, f"Upload failed: {upload_result.get('error', 'Unknown error')}", progress_callback)
@@ -832,7 +859,12 @@ class ReceiptProcessor:
             # Step 2: Google Document AI Processing
             await self._update_step("document_ai", "processing", 20, "Processing with Google Document AI...", progress_callback)
             
+            step_start = time.time()
             document_ai_result = await self.document_ai.extract_text_from_image(image_data)
+            step_times['ocr'] = time.time() - step_start
+            
+            # Prometheus: Record OCR metrics
+            receipt_step_duration.labels(step='ocr').observe(step_times['ocr'])
             
             if not document_ai_result['success']:
                 await self._update_step("document_ai", "error", 0, f"Document AI failed: {document_ai_result.get('error', 'Unknown error')}", progress_callback)
@@ -849,7 +881,22 @@ class ReceiptProcessor:
                 'structured_data': document_ai_result.get('structured_data', {})
             }
             
+            step_start = time.time()
             ai_result = await self.openai_processor.enhance_receipt_data(combined_input)
+            step_times['ai'] = time.time() - step_start
+            
+            # Prometheus: Record AI metrics
+            receipt_step_duration.labels(step='ai').observe(step_times['ai'])
+            
+            # Track token usage and costs
+            if ai_result.get('tokens_used'):
+                tokens = ai_result['tokens_used']
+                receipt_ai_tokens_used.labels(token_type='total').inc(tokens)
+                
+                # Estimate cost (GPT-4 pricing: ~$0.03/1K prompt tokens, ~$0.06/1K completion tokens)
+                # Using average of $0.045/1K tokens
+                estimated_cost = (tokens / 1000) * 0.045
+                receipt_ai_cost_estimate.inc(estimated_cost)
             
             if not ai_result['success']:
                 await self._update_step("ai_processing", "error", 0, f"AI processing failed: {ai_result.get('error', 'Unknown error')}", progress_callback)
@@ -861,16 +908,34 @@ class ReceiptProcessor:
             await self._update_step("validation", "processing", 80, "Validating extracted data...", progress_callback)
             
             # Simulate validation time
+            step_start = time.time()
             await asyncio.sleep(0.5)
             
             # Validate the structured data
             validation_result = self._validate_receipt_data(ai_result['data'])
+            step_times['validation'] = time.time() - step_start
+            
+            # Prometheus: Record validation metrics
+            receipt_step_duration.labels(step='validation').observe(step_times['validation'])
             
             await self._update_step("validation", "completed", 100, f"Validation complete ({validation_result['score']}% accuracy)", progress_callback)
             
             # Compile final results
             end_time = datetime.now()
             processing_time = (end_time - start_time).total_seconds()
+            
+            # Prometheus: Record overall success metrics
+            receipt_processing_duration.observe(processing_time)
+            receipt_processing_success_total.inc()
+            receipt_processing_in_progress.dec()
+            
+            # Track confidence score
+            confidence = ai_result.get('data', {}).get('confidence_score', 0) / 100.0
+            receipt_confidence_score.observe(confidence)
+            
+            # Check if human review is required (low confidence)
+            if confidence < 0.85:
+                receipt_human_review_required.inc()
             
             final_result = {
                 'processing_id': processing_id,
@@ -888,13 +953,26 @@ class ReceiptProcessor:
                     'document_ai_info': document_ai_result,
                     'ai_enhancement_info': ai_result,
                     'validation_info': validation_result,
-                    'steps': [asdict(step) for step in self.processing_steps]
+                    'steps': [asdict(step) for step in self.processing_steps],
+                    'step_times': step_times
                 }
             }
             
             return final_result
             
         except Exception as e:
+            # Prometheus: Record failure metrics
+            receipt_processing_in_progress.dec()
+            
+            # Determine which step failed
+            failed_step = 'unknown'
+            for step in self.processing_steps:
+                if step.status == "error" or step.status == "processing":
+                    failed_step = step.id
+                    break
+            
+            receipt_processing_failed_total.labels(step=failed_step).inc()
+            
             # Mark all remaining steps as error
             for step in self.processing_steps:
                 if step.status == "pending" or step.status == "processing":
@@ -908,7 +986,8 @@ class ReceiptProcessor:
                 'processing_metadata': {
                     'started_at': start_time.isoformat(),
                     'failed_at': datetime.now().isoformat(),
-                    'steps': [asdict(step) for step in self.processing_steps]
+                    'steps': [asdict(step) for step in self.processing_steps],
+                    'step_times': step_times if 'step_times' in locals() else {}
                 }
             }
             
