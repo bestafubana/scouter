@@ -612,46 +612,85 @@
         </div>
         
         <div class="content">
-            <div class="camera-section">
-                <div class="camera-preview" id="cameraPreview">
-                    <div class="camera-placeholder" id="cameraPlaceholder">
-                        <svg fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
-                        </svg>
+            <!-- Side by Side Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
+                <!-- Left Side - Camera/Image Section -->
+                <div class="camera-section">
+                    <div class="camera-preview" id="cameraPreview" style="height: 600px;">
+                        <div class="camera-placeholder" id="cameraPlaceholder">
+                            <svg fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
+                            </svg>
+                            <div>
+                                <p><strong>Camera Preview</strong></p>
+                                <p>Click "Start Camera" to begin</p>
+                            </div>
+                        </div>
+                        <video id="cameraVideo" style="display: none;" autoplay playsinline class="h-full w-full object-contain"></video>
+                        <canvas id="captureCanvas" style="display: none;"></canvas>
+                        <img id="capturedImage" style="display: none;" alt="Captured receipt" class="h-full w-full object-contain">
+                    </div>
+                    
+                    <div class="button-group">
+                        <button class="btn btn-secondary" id="startCameraBtn">
+                            📷 Start Camera
+                        </button>
+                        <button class="btn btn-secondary" id="uploadBtn">
+                            📁 Upload Image
+                        </button>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="captureBtn" style="display: none;">
+                            📸 Capture Photo
+                        </button>
+                        <button class="btn btn-success" id="processBtn" style="display: none;">
+                            🔍 Process Receipt
+                        </button>
+                    </div>
+                    
+                    <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment">
+                </div>
+                
+                <!-- Right Side - Processing Flow -->
+                <div class="flex flex-col h-full" style="height: 600px;">
+                    <!-- Initial State -->
+                    <div id="processingPanelDefault" class="flex-1 flex items-center justify-center text-center text-gray-500 p-8">
                         <div>
-                            <p><strong>Camera Preview</strong></p>
-                            <p>Click "Start Camera" to begin</p>
+                            <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <h3 class="text-lg font-medium">Ready to Process</h3>
+                            <p class="text-sm">Upload a receipt to begin processing</p>
                         </div>
                     </div>
-                    <video id="cameraVideo" style="display: none;" autoplay playsinline></video>
-                    <canvas id="captureCanvas" style="display: none;"></canvas>
-                    <img id="capturedImage" style="display: none;" alt="Captured receipt">
+                    
+                    <!-- Error Display -->
+                    <div id="processingError" class="hidden flex-1 flex items-center justify-center p-6">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 w-full max-w-md">
+                            <div class="flex items-start">
+                                <svg class="w-6 h-6 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold text-red-800 mb-2">Processing Failed</h3>
+                                    <p class="text-red-700 mb-4" id="errorMessage">An error occurred during processing.</p>
+                                    <div class="space-y-2 text-sm text-red-600" id="errorDetails">
+                                        <!-- Error details will be populated here -->
+                                    </div>
+                                    <button onclick="scouter.resetUpload()" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm transition-colors">
+                                        Try Again
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
-                <div class="button-group">
-                    <button class="btn btn-secondary" id="startCameraBtn">
-                        📷 Start Camera
-                    </button>
-                    <button class="btn btn-secondary" id="uploadBtn">
-                        📁 Upload Image
-                    </button>
-                </div>
-                
-                <div class="button-group">
-                    <button class="btn btn-primary" id="captureBtn" style="display: none;">
-                        📸 Capture Photo
-                    </button>
-                    <button class="btn btn-success" id="processBtn" style="display: none;">
-                        🔍 Process Receipt
-                    </button>
-                </div>
-                
-                <input type="file" id="fileInput" class="file-input" accept="image/*" capture="environment">
             </div>
             
-            <!-- Horizontal Flow Graph -->
-            <div class="processing-flow" id="processingFlow" style="display: none;">
-                <div class="bg-white rounded-xl shadow-lg p-6 mb-6 max-w-6xl mx-auto">
+            <!-- Processing Flow - Hidden by default, shown in right panel -->
+            <div class="processing-flow hidden" id="processingFlow">
+                <div class="bg-white rounded-xl shadow-lg p-6">
                     <h3 class="text-lg font-semibold text-gray-800 mb-6">🔄 Processing Receipt</h3>
                     
                     <!-- Horizontal Flow Graph -->
@@ -678,17 +717,17 @@
                                                 'bg-green-500 border-green-500 text-white': step.status === 'completed',
                                                 'bg-red-500 border-red-500 text-white': step.status === 'error',
                                                 'bg-gray-200 border-gray-300 text-gray-400': step.status === 'pending'
-                                            }" class="w-12 h-12 rounded-full border-2 flex items-center justify-center font-semibold text-sm transition-all duration-300">
+                                            }" class="w-8 h-8 rounded-full border-2 flex items-center justify-center font-semibold text-xs transition-all duration-300">
                                                 <template x-if="step.status === 'processing'">
                                                     <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                                 </template>
                                                 <template x-if="step.status === 'completed'">
-                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                                                     </svg>
                                                 </template>
                                                 <template x-if="step.status === 'error'">
-                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                                                     </svg>
                                                 </template>
@@ -704,7 +743,7 @@
                                         
                                         <!-- Connection Line -->
                                         <template x-if="index < steps.length - 1">
-                                            <div class="w-16 h-0.5 mx-2" :class="{
+                                            <div class="w-8 h-0.5 mx-1" :class="{
                                                 'bg-green-500': step.status === 'completed',
                                                 'bg-gray-300': step.status !== 'completed'
                                             }"></div>
@@ -773,9 +812,9 @@
                 </div>
             </div>
             
-            <!-- Human Review Form -->
-            <div class="processing-flow" id="humanReviewSection" style="display: none;">
-                <div class="bg-white rounded-xl shadow-lg p-6 mb-6 max-w-6xl mx-auto">
+            <!-- Human Review Form - Hidden by default, shown in right panel -->
+            <div class="processing-flow hidden" id="humanReviewSection">
+                <div class="bg-white rounded-xl shadow-lg p-6">
                     <div x-data="{
                         get reviewData() { return window.progressSteps?.reviewData || {}; },
                         get receiptId() { return window.progressSteps?.receiptId || ''; },
@@ -1039,9 +1078,6 @@
                 </div>
             </div>
             
-            <div class="error" id="errorSection">
-                <strong>Error:</strong> <span id="errorMessage"></span>
-            </div>
             
             <div class="success-message" id="successSection">
                 <strong>Success!</strong> Receipt processed successfully!
@@ -1196,7 +1232,6 @@
                 
                 // Status sections
                 this.loadingSection = document.getElementById('loadingSection');
-                this.errorSection = document.getElementById('errorSection');
                 this.successSection = document.getElementById('successSection');
                 this.resultsSection = document.getElementById('resultsSection');
                 this.jsonOutput = document.getElementById('jsonOutput');
@@ -1426,7 +1461,74 @@
                 } catch (error) {
                     console.error('Processing error:', error);
                     this.hideProcessingFlow();
-                    this.showError(`Processing failed: ${error.message}`);
+                    this.showError(`Processing failed: ${error.message}`, [
+                        'Check your internet connection',
+                        'Ensure the image is clear and readable',
+                        'Try uploading a different image'
+                    ]);
+                }
+            }
+            
+            resetUpload() {
+                // Clear captured image data
+                this.capturedImageData = null;
+                
+                // Hide image and show placeholder
+                const capturedImage = document.getElementById('capturedImage');
+                const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+                const cameraVideo = document.getElementById('cameraVideo');
+                
+                if (capturedImage) {
+                    capturedImage.style.display = 'none';
+                    capturedImage.src = '';
+                }
+                if (cameraPlaceholder) {
+                    cameraPlaceholder.style.display = 'block';
+                }
+                if (cameraVideo) {
+                    cameraVideo.style.display = 'none';
+                }
+                
+                // Reset button states
+                const captureBtn = document.getElementById('captureBtn');
+                const processBtn = document.getElementById('processBtn');
+                const startCameraBtn = document.getElementById('startCameraBtn');
+                const uploadBtn = document.getElementById('uploadBtn');
+                
+                if (captureBtn) captureBtn.style.display = 'none';
+                if (processBtn) processBtn.style.display = 'none';
+                if (startCameraBtn) startCameraBtn.style.display = 'block';
+                if (uploadBtn) uploadBtn.style.display = 'block';
+                
+                // Reset processing panel to default state
+                this.hideProcessingFlow();
+                
+                // Restore default right panel
+                const rightPanel = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2 > div:last-child');
+                if (rightPanel) {
+                    rightPanel.innerHTML = `
+                        <div class="flex-1 flex items-center justify-center text-center text-gray-500 p-8">
+                            <div>
+                                <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <h3 class="text-lg font-medium">Ready to Process</h3>
+                                <p class="text-sm">Upload a receipt to begin processing</p>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Stop camera if running
+                if (this.currentStream) {
+                    this.currentStream.getTracks().forEach(track => track.stop());
+                    this.currentStream = null;
+                }
+                
+                // Reset file input
+                const fileInput = document.getElementById('fileInput');
+                if (fileInput) {
+                    fileInput.value = '';
                 }
             }
 
@@ -1478,6 +1580,7 @@
             }
             
             async pollProcessingProgress(sessionId) {
+                console.log(`🔄 Starting to poll progress for session: ${sessionId}`);
                 const maxAttempts = 60; // 60 seconds max
                 let attempts = 0;
                 
@@ -1486,25 +1589,30 @@
                         const response = await fetch(`/api/receipt/progress/${sessionId}`);
                         
                         if (!response.ok) {
+                            console.error(`❌ Progress API error: ${response.status} ${response.statusText}`);
                             throw new Error('Failed to get progress');
                         }
                         
                         const data = await response.json();
+                        console.log(`📊 Progress update #${attempts + 1}:`, data);
                         
                         // Update progress steps
                         this.updateProgressSteps(data.progress_updates);
                         
                         if (data.status === 'completed') {
+                            console.log('✅ Processing completed successfully!');
                             // Processing completed successfully
                             this.hideProcessingFlow();
                             this.showSuccess('Receipt processed successfully!');
                             this.showResults(data.result.receipt_data);
                             return;
                         } else if (data.status === 'awaiting_human_review') {
+                            console.log('👤 Awaiting human review');
                             // Show human review form
                             this.showHumanReviewForm(data.result);
                             return;
                         } else if (data.status === 'error') {
+                            console.error('❌ Processing failed with error:', data.error);
                             // Processing failed
                             throw new Error(data.error || 'Processing failed');
                         }
@@ -1514,9 +1622,19 @@
                         attempts++;
                         
                     } catch (error) {
-                        console.error('Progress polling error:', error);
+                        console.error('🚨 Progress polling error:', error);
+                        console.error('🔍 Error details:', {
+                            message: error.message,
+                            stack: error.stack,
+                            sessionId: sessionId,
+                            attempt: attempts + 1
+                        });
                         this.hideProcessingFlow();
-                        this.showError(`Progress polling failed: ${error.message}`);
+                        this.showError(`Progress polling failed: ${error.message}`, [
+                            `Session ID: ${sessionId}`,
+                            `Attempt: ${attempts + 1}/${maxAttempts}`,
+                            'Check browser console for details'
+                        ]);
                         return;
                     }
                 }
@@ -1576,33 +1694,129 @@
             }
 
             hideLoading() {
-                this.loadingSection.classList.remove('active');
+                if (this.loadingSection) {
+                    this.loadingSection.classList.remove('active');
+                }
             }
             
             showProcessingFlow() {
+                // Hide default panel and show processing flow in right panel
+                const defaultPanel = document.getElementById('processingPanelDefault');
+                const errorPanel = document.getElementById('processingError');
                 const processingFlow = document.getElementById('processingFlow');
-                if (processingFlow) {
-                    processingFlow.style.display = 'block';
+                const rightPanel = processingFlow?.parentElement?.querySelector('.flex.flex-col.h-full') || 
+                                  document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2 > div:last-child');
+                
+                if (defaultPanel) defaultPanel.classList.add('hidden');
+                if (errorPanel) errorPanel.classList.add('hidden');
+                
+                if (processingFlow && rightPanel) {
+                    // Move processing flow into the right panel
+                    rightPanel.innerHTML = '';
+                    rightPanel.appendChild(processingFlow);
+                    processingFlow.classList.remove('hidden');
+                    processingFlow.classList.add('flex-1', 'overflow-y-auto');
                 }
             }
             
             hideProcessingFlow() {
+                // Restore default panel and hide processing flow
+                const defaultPanel = document.getElementById('processingPanelDefault');
                 const processingFlow = document.getElementById('processingFlow');
-                if (processingFlow) {
-                    processingFlow.style.display = 'none';
+                
+                if (defaultPanel) defaultPanel.classList.remove('hidden');
+                if (processingFlow) processingFlow.classList.add('hidden');
+            }
+            
+            showError(message, details = null) {
+                console.error('🚨 Processing Error:', message, details);
+                
+                // Hide processing flow and show error in right panel (same approach as processing flow)
+                const processingFlow = document.getElementById('processingFlow');
+                const humanReviewSection = document.getElementById('humanReviewSection');
+                const rightPanel = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2 > div:last-child');
+                
+                if (processingFlow) processingFlow.classList.add('hidden');
+                if (humanReviewSection) humanReviewSection.classList.add('hidden');
+                
+                // Create error display in right panel
+                if (rightPanel) {
+                    const detailsHTML = details ? (Array.isArray(details) ? details.map(d => `<div>• ${d}</div>`).join('') : `<div>• ${details}</div>`) : '';
+                    
+                    const errorHTML = `
+                        <div class="flex-1 flex items-center justify-center p-6">
+                            <div class="bg-red-50 border border-red-200 rounded-lg p-4 w-full max-w-md">
+                                <div class="flex items-start">
+                                    <svg class="w-6 h-6 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <div class="flex-1">
+                                        <h3 class="text-lg font-semibold text-red-800 mb-2">Processing Failed</h3>
+                                        <p class="text-red-700 mb-4">${message}</p>
+                                        <div class="space-y-2 text-sm text-red-600">
+                                            ${detailsHTML}
+                                        </div>
+                                        <button onclick="scouter.resetUpload()" class="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm transition-colors">
+                                            Try Again
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    rightPanel.innerHTML = errorHTML;
                 }
+                
+                // Also log details if provided
+                if (details) {
+                    console.error('🔍 Error Details:', details);
+                }
+                
+                // Hide other sections
+                this.hideLoading();
             }
             
             showHumanReviewForm(result) {
                 console.log('🔍 showHumanReviewForm called with result:', result);
                 
-                // Hide processing flow
-                this.hideProcessingFlow();
+                // Check if there's an error in the result
+                if (result && result.error) {
+                    const errorDetails = [];
+                    
+                    // Analyze the error and provide helpful details
+                    if (result.error.includes('OpenAI') || result.error.includes('JSON')) {
+                        errorDetails.push('AI processing failed - unable to extract receipt data');
+                        errorDetails.push('This may be due to poor image quality or unreadable text');
+                    }
+                    if (result.error.includes('Document AI')) {
+                        errorDetails.push('OCR processing failed - unable to read text from image');
+                    }
+                    if (result.error.includes('S3')) {
+                        errorDetails.push('Image upload failed - check your internet connection');
+                    }
+                    
+                    // Show error with helpful message
+                    this.showError(
+                        'Receipt processing failed. Please try with a clearer image.',
+                        errorDetails.length > 0 ? errorDetails : ['Unknown error occurred during processing']
+                    );
+                    return;
+                }
                 
-                // Show human review section
+                // Hide processing flow and show human review in right panel (same approach as processing flow)
+                const processingFlow = document.getElementById('processingFlow');
                 const humanReviewSection = document.getElementById('humanReviewSection');
-                if (humanReviewSection) {
-                    humanReviewSection.style.display = 'block';
+                const rightPanel = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2 > div:last-child');
+                
+                if (processingFlow) processingFlow.classList.add('hidden');
+                
+                if (humanReviewSection && rightPanel) {
+                    // Move human review into the right panel
+                    rightPanel.innerHTML = '';
+                    rightPanel.appendChild(humanReviewSection);
+                    humanReviewSection.classList.remove('hidden');
+                    humanReviewSection.classList.add('flex-1', 'overflow-y-auto');
                 }
                 
                 // Populate review data from AI result
@@ -1716,13 +1930,9 @@
                 }
             }
 
-            showError(message) {
-                this.errorMessage.textContent = message;
-                this.errorSection.classList.add('active');
-            }
 
             hideError() {
-                this.errorSection.classList.remove('active');
+                // Old error section removed - errors now display in right panel
             }
 
             showSuccess() {
@@ -2109,7 +2319,12 @@
             }
         };
         
-        // Debug function to test human review form
+        // Debug functions for testing
+        window.testError = function() {
+            console.log('🧪 Testing error display...');
+            scouter.showError('Test error message', ['Detail 1', 'Detail 2', 'Detail 3']);
+        };
+        
         window.testHumanReview = function() {
             console.log('🧪 Testing human review form...');
             
