@@ -11,29 +11,70 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Start Scouter
+### 2. Install Monitoring Tools (Optional)
+
+```bash
+# macOS
+brew install prometheus grafana
+
+# Linux
+sudo apt-get install prometheus grafana
+```
+
+### 3. Start Scouter
 
 ```bash
 ./start.sh
 ```
 
+**The start script will automatically:**
+- ✅ Start MailHog (email testing)
+- ✅ Start Prometheus (if installed) - creates `prometheus.yml` if missing
+- ✅ Start Grafana (if installed)
+- ✅ Start Scouter application
+
+**You'll see output like:**
+```
+📧 Starting MailHog for email testing...
+✅ MailHog started successfully
+
+📊 Starting Prometheus for metrics...
+✅ Prometheus started successfully
+📈 Prometheus UI: http://localhost:9090
+
+📈 Starting Grafana for dashboards...
+✅ Grafana started successfully
+📊 Grafana UI: http://localhost:3000
+
+🚀 Starting authentication server on http://localhost:5001
+🔗 Quick Links:
+   • Scouter App: http://localhost:5001/index.html
+   • MailHog: http://localhost:8025
+   • Prometheus: http://localhost:9090
+   • Grafana: http://localhost:3000
+```
+
 Metrics are automatically exposed at: **http://localhost:5001/metrics**
 
-### 3. View Raw Metrics
+### 4. View Raw Metrics
 
 ```bash
 curl http://localhost:5001/metrics
 ```
 
-## Setup Prometheus (5 minutes)
+## Manual Setup (Optional - start.sh does this automatically)
 
-### macOS
+### Setup Prometheus
+
+If you installed Prometheus but want to customize the config:
+
+#### macOS
 
 ```bash
 # Install
 brew install prometheus
 
-# Create config
+# Edit the auto-generated prometheus.yml or create custom config
 cat > prometheus.yml <<'EOF'
 global:
   scrape_interval: 15s
@@ -47,7 +88,7 @@ scrape_configs:
     scrape_interval: 5s
 EOF
 
-# Start Prometheus
+# Restart with ./start.sh or manually:
 prometheus --config.file=prometheus.yml
 ```
 
