@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file if it exists
 load_dotenv()
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_mail import Mail, Message
@@ -50,6 +50,12 @@ authenticated_users: Dict[str, dict] = {}
 # Configuration
 TOKEN_EXPIRY_MINUTES = 15
 DEV_MODE = True  # Set to False in production
+
+# Session configuration (must be after DEV_MODE is defined)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production-' + secrets.token_hex(16))
+app.config['SESSION_COOKIE_SECURE'] = not DEV_MODE  # Only send cookie over HTTPS in production
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Initialize receipt processor
 receipt_processor = ReceiptProcessor()
@@ -444,8 +450,9 @@ def verify_token():
             # Create authenticated session
             session_id = secrets.token_urlsafe(32)
             
+            # Store in both in-memory dict and Flask session
             authenticated_users[session_id] = {
-                'user_id': user.id,
+                'user_id': user.uuid,  # Use UUID instead of integer ID
                 'email': user.email,
                 'name': user.name,
                 'organization': user.organization.name,
@@ -455,12 +462,20 @@ def verify_token():
                 'last_activity': datetime.now()
             }
             
+            # Also store in Flask session for easier access
+            session['user_id'] = user.uuid
+            session['email'] = user.email
+            session['name'] = user.name
+            session['session_id'] = session_id
+            
             print(f"✅ User authenticated: {user.name} ({user.email}) - {user.organization.name}")
+            print(f"   UUID: {user.uuid}")
+            print(f"   Session ID: {session_id}")
             
             return jsonify({
                 'success': True,
                 'user': {
-                    'id': user.id,
+                    'id': user.uuid,  # Return UUID instead of integer ID
                     'email': user.email,
                     'name': user.name,
                     'organization': user.organization.name,
@@ -563,21 +578,32 @@ def register_user():
         # Create authenticated session
         session_id = secrets.token_urlsafe(32)
         
+        # Store in both in-memory dict and Flask session
         authenticated_users[session_id] = {
-            'user_id': user.id,
+            'user_id': user.uuid,  # Use UUID instead of integer ID
             'email': user.email,
             'name': user.name,
             'organization': organization.name,
+            'is_admin': user.is_admin,
+            'is_manager': user.is_manager,
             'authenticated_at': datetime.now(),
             'last_activity': datetime.now()
         }
         
+        # Also store in Flask session for easier access
+        session['user_id'] = user.uuid
+        session['email'] = user.email
+        session['name'] = user.name
+        session['session_id'] = session_id
+        
         print(f"🎉 New user registered: {user.name} ({user.email}) - {organization.name}")
+        print(f"   UUID: {user.uuid}")
+        print(f"   Session ID: {session_id}")
         
         return jsonify({
             'success': True,
             'user': {
-                'id': user.id,
+                'id': user.uuid,  # Return UUID instead of integer ID
                 'email': user.email,
                 'name': user.name,
                 'organization': organization.name,
@@ -1092,33 +1118,16 @@ def process_receipt():
         if not image_data:
             return jsonify({'error': 'No image data provided'}), 400
         
-        # Get current user (for dev mode, use a default user ID)
-        user_id = None
-        if DEV_MODE:
-            # In dev mode, create or get a test user
-            test_user = User.query.filter_by(email='test@example.com').first()
-            if not test_user:
-                # Create a test user and organization for dev mode
-                test_org = Organization(name='Test Organization')
-                db.session.add(test_org)
-                db.session.commit()
-                
-                test_user = User(
-                    email='test@example.com',
-                    name='Test User',
-                    org_id=test_org.id,
-                    is_admin=True
-                )
-                db.session.add(test_user)
-                db.session.commit()
-            user_id = test_user.id
-        else:
-            # Get user from session in production
-            session_id = request.headers.get('Authorization', '').replace('Bearer ', '')
-            user_data = authenticated_users.get(session_id)
-            if not user_data:
-                return jsonify({'error': 'Authentication required'}), 401
-            user_id = user_data['user_id']
+        # Get current user from session
+        user_id = session.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'Authentication required. Please log in first.'}), 401
+        
+        # Verify user exists
+        user = User.query.filter_by(uuid=user_id).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
         
         # Create Receipt record in database (Step 1 from lifecycle)
         receipt = Receipt(
@@ -1412,6 +1421,37 @@ def list_processing_sessions():
         'active_sessions': sessions_summary,
         'total_sessions': len(active_processing_sessions)
     })
+
+@app.route('/api/receipts', methods=['GET'])
+def list_receipts():
+    """List all receipts for the authenticated user"""
+    try:
+        # Get user from session
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        # Get user from database
+        user = User.query.filter_by(uuid=user_id).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Get receipts for the user
+        receipts = Receipt.query.filter_by(
+            user_id=user_id,
+            is_deleted=False
+        ).order_by(Receipt.created_at.desc()).all()
+        
+        # Convert to dictionary format
+        receipts_data = [receipt.to_dict() for receipt in receipts]
+        
+        return jsonify({
+            'receipts': receipts_data,
+            'total': len(receipts_data)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch receipts: {str(e)}'}), 500
 
 @app.route('/api/receipt/verify', methods=['POST'])
 def verify_receipt():

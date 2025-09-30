@@ -628,7 +628,7 @@
                         </div>
                         <video id="cameraVideo" style="display: none;" autoplay playsinline class="h-full w-full object-contain"></video>
                         <canvas id="captureCanvas" style="display: none;"></canvas>
-                        <img id="capturedImage" style="display: none;" alt="Captured receipt" class="h-full w-full object-contain">
+                        <img id="capturedImage" style="display: none;" alt="Captured receipt" class="h-full w-full object-contain cursor-pointer hover:opacity-90 transition-opacity" onclick="openImageOverlay(this.src)">
                     </div>
                     
                     <div class="button-group">
@@ -808,6 +808,58 @@
                                 </div>
                             </template>
                         </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Receipts Listing Section -->
+            <div class="max-w-7xl mx-auto mt-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">📋 Receipts</h2>
+                        <div class="text-sm text-gray-500">
+                            <span id="receiptsCount">0</span> receipts processed
+                        </div>
+                    </div>
+                    
+                    <!-- Filters Placeholder -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <div class="flex items-center justify-center text-gray-500">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                            </svg>
+                            <span class="text-sm font-medium">Filters will be added here</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Receipts Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Time</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700">Vendor</th>
+                                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Amount</th>
+                                    <th class="text-right py-3 px-4 font-semibold text-gray-700">Tax</th>
+                                    <th class="text-center py-3 px-4 font-semibold text-gray-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receiptsTableBody">
+                                <!-- Receipt rows will be populated here -->
+                                <tr class="border-b border-gray-100">
+                                    <td colspan="6" class="text-center py-8 text-gray-500">
+                                        <div class="flex flex-col items-center">
+                                            <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                            <p class="text-lg font-medium">No receipts yet</p>
+                                            <p class="text-sm">Upload your first receipt to get started</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -1200,7 +1252,56 @@
         </div>
     </div>
 
+    <!-- Image Overlay Modal -->
+    <div id="imageOverlay" class="fixed inset-0 bg-black bg-opacity-75 z-50 hidden flex items-center justify-center p-4" onclick="closeImageOverlay(event)">
+        <div class="relative max-w-4xl max-h-full">
+            <img id="overlayImage" src="" alt="Receipt preview" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+            <button id="closeOverlayBtn" class="absolute top-4 right-4 bg-black bg-opacity-50 hover:bg-opacity-75 text-white rounded-full p-2 transition-all" onclick="closeImageOverlay()">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+            <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
+                Press Esc or click outside to close
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Image Overlay Functions
+        function openImageOverlay(imageSrc) {
+            const overlay = document.getElementById('imageOverlay');
+            const overlayImage = document.getElementById('overlayImage');
+            
+            overlayImage.src = imageSrc;
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImageOverlay(event) {
+            // Only close if clicking on the backdrop or the close button
+            if (event && event.target.id !== 'imageOverlay' && event.target.id !== 'closeOverlayBtn' && !event.target.closest('#closeOverlayBtn')) {
+                return;
+            }
+            
+            const overlay = document.getElementById('imageOverlay');
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+            
+            // Restore body scroll
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close overlay on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeImageOverlay();
+            }
+        });
+
         class Scouter {
             constructor() {
                 this.currentStream = null;
@@ -1210,6 +1311,7 @@
                 this.initializeElements();
                 this.bindEvents();
                 this.initializeAuth();
+                // loadReceipts() will be called after authentication in setAuthenticated()
             }
 
             initializeElements() {
@@ -1407,6 +1509,9 @@
                     this.processBtn.style.display = 'block';
                     
                     this.hideError();
+                    
+                    // Reset right panel to default state for new image
+                    this.resetRightPanelToDefault();
                 };
                 
                 reader.onerror = () => {
@@ -1538,31 +1643,31 @@
                 const steps = [
                     {
                         id: 'upload',
-                        name: 'Upload to S3',
+                        name: 'Image Upload',
                         status: 'pending',
                         progress: 0,
                         message: 'Preparing to upload image...'
                     },
                     {
                         id: 'document_ai',
-                        name: 'Google Document AI',
+                        name: 'Image Recognition',
                         status: 'pending',
                         progress: 0,
                         message: 'Waiting for upload to complete...'
                     },
                     {
                         id: 'ai_processing',
-                        name: 'GPT Enhancement',
+                        name: 'AI Analysis',
                         status: 'pending',
                         progress: 0,
-                        message: 'Waiting for Document AI processing...'
+                        message: 'Waiting for image recognition...'
                     },
                     {
                         id: 'human_review',
                         name: 'Human Review',
                         status: 'pending',
                         progress: 0,
-                        message: 'Waiting for AI processing...'
+                        message: 'Waiting for AI analysis...'
                     },
                     {
                         id: 'validation',
@@ -1804,12 +1909,14 @@
                     return;
                 }
                 
-                // Hide processing flow and show human review in right panel (same approach as processing flow)
+                // Hide processing flow and show human review in right panel
                 const processingFlow = document.getElementById('processingFlow');
                 const humanReviewSection = document.getElementById('humanReviewSection');
                 const rightPanel = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2 > div:last-child');
                 
-                if (processingFlow) processingFlow.classList.add('hidden');
+                if (processingFlow) {
+                    processingFlow.classList.add('hidden');
+                }
                 
                 if (humanReviewSection && rightPanel) {
                     // Move human review into the right panel
@@ -1924,6 +2031,12 @@
                     // Update current step message
                     window.progressSteps.currentStep = 'Receipt verified and processing completed!';
                     
+                    // Reload receipts list to show the newly verified receipt
+                    this.loadReceipts();
+                    
+                    // Show success message
+                    this.showSuccess();
+                    
                 } catch (error) {
                     console.error('Verification error:', error);
                     this.showError(`Verification failed: ${error.message}`);
@@ -1933,6 +2046,106 @@
 
             hideError() {
                 // Old error section removed - errors now display in right panel
+            }
+            
+            // Receipts Management Methods
+            async loadReceipts() {
+                try {
+                    const response = await fetch('/api/receipts');
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.updateReceiptsTable(data.receipts);
+                    } else {
+                        console.error('Failed to load receipts:', response.statusText);
+                        this.updateReceiptsTable([]);
+                    }
+                } catch (error) {
+                    console.error('Error loading receipts:', error);
+                    this.updateReceiptsTable([]);
+                }
+            }
+            
+            updateReceiptsTable(receipts = []) {
+                const tableBody = document.getElementById('receiptsTableBody');
+                const receiptsCount = document.getElementById('receiptsCount');
+                
+                if (!tableBody || !receiptsCount) return;
+                
+                // Update count
+                receiptsCount.textContent = receipts.length;
+                
+                if (receipts.length === 0) {
+                    // Show empty state
+                    tableBody.innerHTML = `
+                        <tr class="border-b border-gray-100">
+                            <td colspan="6" class="text-center py-8 text-gray-500">
+                                <div class="flex flex-col items-center">
+                                    <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    <p class="text-lg font-medium">No receipts yet</p>
+                                    <p class="text-sm">Upload your first receipt to get started</p>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    // Show receipts
+                    tableBody.innerHTML = receipts.map(receipt => {
+                        const receiptDate = receipt.receipt_date ? new Date(receipt.receipt_date).toISOString().split('T')[0] : 'N/A';
+                        const uploadTime = new Date(receipt.upload_date).toLocaleTimeString('en-US', { 
+                            hour12: false, 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                        });
+                        const vendor = receipt.vendor_name || 'Unknown Vendor';
+                        const amount = receipt.amount_total ? `$${receipt.amount_total}` : '$0.00';
+                        const tax = receipt.tax_amount ? `$${receipt.tax_amount}` : '$0.00';
+                        
+                        return `
+                            <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                <td class="py-4 px-4 text-sm text-gray-900">${receiptDate}</td>
+                                <td class="py-4 px-4 text-sm text-gray-600">${uploadTime}</td>
+                                <td class="py-4 px-4 text-sm font-medium text-gray-900">${vendor}</td>
+                                <td class="py-4 px-4 text-sm text-right font-semibold text-gray-900">${amount}</td>
+                                <td class="py-4 px-4 text-sm text-right text-gray-600">${tax}</td>
+                                <td class="py-4 px-4 text-center">
+                                    <button class="text-blue-600 hover:text-blue-800 transition-colors" onclick="scouter.showReceiptDetails('${receipt.id}')" title="View details">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                        </svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            }
+            
+            showReceiptDetails(receiptId) {
+                // Placeholder for showing receipt details
+                console.log('Receipt details for ID:', receiptId);
+                // TODO: Implement receipt details modal
+                alert(`Receipt Details:\n\nReceipt ID: ${receiptId}\n\nThis will show detailed receipt information in a modal.`);
+            }
+            
+            resetRightPanelToDefault() {
+                // Reset right panel to default state without affecting the image
+                const rightPanel = document.querySelector('.grid.grid-cols-1.lg\\:grid-cols-2 > div:last-child');
+                if (rightPanel) {
+                    rightPanel.innerHTML = `
+                        <div id="processingPanelDefault" class="flex-1 flex items-center justify-center text-center text-gray-500 p-8">
+                            <div>
+                                <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <h3 class="text-lg font-medium">Ready to Process</h3>
+                                <p class="text-sm">Click "Process Receipt" to begin</p>
+                            </div>
+                        </div>
+                    `;
+                }
             }
 
             showSuccess() {
@@ -2067,6 +2280,9 @@
                 } else {
                     this.inviteBtn.style.display = 'none';
                 }
+                
+                // Load receipts after authentication is complete
+                this.loadReceipts();
                 
                 // Store authentication and session
                 const authData = { user };
