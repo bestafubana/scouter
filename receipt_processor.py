@@ -27,7 +27,10 @@ from metrics import (
     receipt_ai_tokens_used,
     receipt_ai_cost_estimate,
     receipt_upload_size_bytes,
-    receipt_human_review_required
+    receipt_human_review_required,
+    s3_upload_errors_total,
+    document_ai_errors_total,
+    openai_errors_total
 )
 
 # Third-party imports (will be added to requirements.txt)
@@ -183,12 +186,30 @@ class S3Uploader:
             }
             
         except ClientError as e:
+            # Extract AWS error code and type
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            http_status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode', '500')
+            
+            # Track S3 error in Prometheus
+            s3_upload_errors_total.labels(
+                error_code=str(http_status),
+                error_type=error_code
+            ).inc()
+            
             return {
                 'success': False,
                 'error': str(e),
+                'error_code': error_code,
+                'http_status': http_status,
                 'mock': False
             }
         except Exception as e:
+            # Track generic upload errors
+            s3_upload_errors_total.labels(
+                error_code='500',
+                error_type='UnknownError'
+            ).inc()
+            
             return {
                 'success': False,
                 'error': f"Upload failed: {str(e)}",
@@ -469,9 +490,42 @@ Thank you for shopping!"""
             }
             
         except Exception as e:
+            # Extract error details for tracking
+            error_str = str(e)
+            error_code = '500'  # Default to server error
+            error_type = 'UnknownError'
+            
+            # Parse Google API errors
+            # Common patterns: "403 Permission denied", "429 Resource exhausted"
+            if 'google.api_core.exceptions' in str(type(e)):
+                if hasattr(e, 'code'):
+                    error_code = str(e.code.value[0]) if hasattr(e.code, 'value') else '500'
+                if hasattr(e, 'grpc_status_code'):
+                    error_type = str(e.grpc_status_code.name)
+            elif '403' in error_str or 'Permission' in error_str or 'PermissionDenied' in error_str:
+                error_code = '403'
+                error_type = 'PermissionDenied'
+            elif '429' in error_str or 'quota' in error_str.lower() or 'rate' in error_str.lower():
+                error_code = '429'
+                error_type = 'ResourceExhausted'
+            elif '400' in error_str or 'Invalid' in error_str:
+                error_code = '400'
+                error_type = 'InvalidArgument'
+            elif '503' in error_str or 'Unavailable' in error_str:
+                error_code = '503'
+                error_type = 'Unavailable'
+            
+            # Track Document AI error in Prometheus
+            document_ai_errors_total.labels(
+                error_code=error_code,
+                error_type=error_type
+            ).inc()
+            
             return {
                 'success': False,
-                'error': f"Google Document AI processing failed: {str(e)}",
+                'error': f"Google Document AI processing failed: {error_str}",
+                'error_code': error_code,
+                'error_type': error_type,
                 'mock': False
             }
 
@@ -620,9 +674,43 @@ class OpenAIProcessor:
             }
             
         except Exception as e:
+            # Extract error details for tracking
+            error_str = str(e)
+            error_code = '500'  # Default to server error
+            error_type = 'UnknownError'
+            
+            # Parse OpenAI API errors
+            if hasattr(e, 'status_code'):
+                error_code = str(e.status_code)
+            if hasattr(e, 'type'):
+                error_type = e.type
+            elif '401' in error_str or 'Unauthorized' in error_str or 'authentication' in error_str.lower():
+                error_code = '401'
+                error_type = 'Unauthorized'
+            elif '429' in error_str or 'rate_limit' in error_str.lower():
+                error_code = '429'
+                error_type = 'rate_limit_exceeded'
+            elif '400' in error_str or 'invalid_request' in error_str.lower():
+                error_code = '400'
+                error_type = 'invalid_request_error'
+            elif '500' in error_str or 'InternalError' in error_str:
+                error_code = '500'
+                error_type = 'api_error'
+            elif '503' in error_str or 'overloaded' in error_str.lower():
+                error_code = '503'
+                error_type = 'service_unavailable'
+            
+            # Track OpenAI error in Prometheus
+            openai_errors_total.labels(
+                error_code=error_code,
+                error_type=error_type
+            ).inc()
+            
             return {
                 'success': False,
-                'error': f"OpenAI processing failed: {str(e)}",
+                'error': f"OpenAI processing failed: {error_str}",
+                'error_code': error_code,
+                'error_type': error_type,
                 'mock': False
             }
     
@@ -764,9 +852,43 @@ class OpenAIProcessor:
             }
             
         except Exception as e:
+            # Extract error details for tracking
+            error_str = str(e)
+            error_code = '500'  # Default to server error
+            error_type = 'UnknownError'
+            
+            # Parse OpenAI API errors
+            if hasattr(e, 'status_code'):
+                error_code = str(e.status_code)
+            if hasattr(e, 'type'):
+                error_type = e.type
+            elif '401' in error_str or 'Unauthorized' in error_str or 'authentication' in error_str.lower():
+                error_code = '401'
+                error_type = 'Unauthorized'
+            elif '429' in error_str or 'rate_limit' in error_str.lower():
+                error_code = '429'
+                error_type = 'rate_limit_exceeded'
+            elif '400' in error_str or 'invalid_request' in error_str.lower():
+                error_code = '400'
+                error_type = 'invalid_request_error'
+            elif '500' in error_str or 'InternalError' in error_str:
+                error_code = '500'
+                error_type = 'api_error'
+            elif '503' in error_str or 'overloaded' in error_str.lower():
+                error_code = '503'
+                error_type = 'service_unavailable'
+            
+            # Track OpenAI error in Prometheus
+            openai_errors_total.labels(
+                error_code=error_code,
+                error_type=error_type
+            ).inc()
+            
             return {
                 'success': False,
-                'error': f"OpenAI enhancement failed: {str(e)}",
+                'error': f"OpenAI enhancement failed: {error_str}",
+                'error_code': error_code,
+                'error_type': error_type,
                 'mock': False
             }
 

@@ -6,6 +6,21 @@ Scouter is a standalone receipt processing system with magic link authentication
 
 - [Scouter - Receipt Processing System](#scouter---receipt-processing-system)
   - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+    - [System Architecture](#system-architecture)
+    - [Technical Stack](#technical-stack)
+      - [**Backend (Python 3.12+)**](#backend-python-312)
+      - [**Frontend**](#frontend)
+      - [**External Services**](#external-services)
+      - [**Database Schema**](#database-schema)
+    - [Processing Pipeline](#processing-pipeline)
+    - [Resource Profile](#resource-profile)
+      - [**CPU Usage**](#cpu-usage)
+      - [**Memory Usage**](#memory-usage)
+      - [**Network I/O**](#network-io)
+      - [**Storage Requirements**](#storage-requirements)
+    - [Scalability Characteristics](#scalability-characteristics)
+    - [Security Features](#security-features)
   - [Features](#features)
   - [Quick Start](#quick-start)
     - [1. Setup Environment](#1-setup-environment)
@@ -72,22 +87,18 @@ Scouter is a standalone receipt processing system with magic link authentication
   - [Database Configuration](#database-configuration)
     - [Development (SQLite)](#development-sqlite)
     - [Production (PostgreSQL)](#production-postgresql)
-  - [Security Features](#security-features)
+  - [Security Features](#security-features-1)
   - [File Structure](#file-structure)
-  - [Performance Monitoring with Prometheus \& Grafana](#performance-monitoring-with-prometheus--grafana)
-    - [📊 Available Metrics](#-available-metrics)
+  - [Performance Monitoring](#performance-monitoring)
+    - [🚀 Quick Start](#-quick-start)
+    - [📖 Full Documentation](#-full-documentation)
+    - [📊 Key Metrics](#-key-metrics)
       - [**Overall Pipeline Metrics**](#overall-pipeline-metrics)
       - [**Per-Step Performance**](#per-step-performance)
       - [**Quality Metrics**](#quality-metrics)
       - [**Cost Tracking**](#cost-tracking)
       - [**Additional Metrics**](#additional-metrics)
-    - [🚀 Quick Start with Prometheus](#-quick-start-with-prometheus)
-    - [📈 Quick Start with Grafana](#-quick-start-with-grafana)
-    - [📊 Sample Grafana Dashboard JSON](#-sample-grafana-dashboard-json)
-    - [🔍 Useful Prometheus Queries](#-useful-prometheus-queries)
-    - [🎯 Recommended Alerts](#-recommended-alerts)
-    - [📝 Testing Metrics](#-testing-metrics)
-    - [🎨 Grafana Dashboard Tips](#-grafana-dashboard-tips)
+      - [**Service Error Tracking**](#service-error-tracking)
   - [Troubleshooting](#troubleshooting)
     - [Email Issues](#email-issues)
     - [Database Issues](#database-issues)
@@ -102,6 +113,112 @@ Scouter is a standalone receipt processing system with magic link authentication
     - [Environment Variables](#environment-variables)
     - [Deployment Checklist](#deployment-checklist)
 
+## Overview
+
+Scouter is an **AI-powered receipt processing platform** designed for organizations to automate expense tracking and receipt digitization. The system combines OCR technology, AI analysis, and human-in-the-loop verification to extract structured data from receipt images with high accuracy.
+
+### System Architecture
+
+**Application Type:** Full-stack web application with async processing pipeline  
+**Deployment Model:** Single EC2 instance + RDS database + external AI services  
+**Processing Model:** Synchronous API with background async tasks  
+**Storage:** AWS S3 for images, PostgreSQL for structured data
+
+### Technical Stack
+
+#### **Backend (Python 3.12+)**
+- **Framework:** Flask 3.0 (WSGI web server)
+- **Database ORM:** SQLAlchemy 2.0 with Flask-SQLAlchemy
+- **Async Processing:** Python asyncio for concurrent AI API calls
+- **Image Processing:** Pillow (PIL) + ImageMagick for preprocessing
+- **Authentication:** Custom magic link system (passwordless)
+- **Session Management:** Flask sessions with secure cookies
+- **Database Migrations:** Flask-Migrate (Alembic)
+
+#### **Frontend**
+- **UI Framework:** Single-page HTML application
+- **Reactivity:** Alpine.js for real-time progress updates
+- **Styling:** Tailwind CSS
+- **Image Capture:** Browser-based camera/file upload
+
+#### **External Services**
+- **Image Storage:** AWS S3 (receipt images, ~500KB-5MB per receipt)
+- **OCR Engine:** Google Document AI (Cloud-based, pay-per-page)
+- **AI Analysis:** OpenAI GPT-4 (API calls, ~500-1500 tokens per receipt)
+- **Email:** Amazon SES for magic link delivery
+- **Monitoring:** Prometheus + Grafana (optional, self-hosted)
+
+#### **Database Schema**
+- **Users:** UUID-based, multi-tenant with organization support
+- **Organizations:** Multi-tenant isolation
+- **Receipts:** Stores processed data + AI metadata + confidence scores
+- **Sessions:** In-memory active processing tracking
+
+### Processing Pipeline
+
+1. **Image Preprocessing** → Local (ImageMagick/Pillow: 0.5-2 seconds)
+   - Resize to optimal dimensions (max 2048px)
+   - Convert to JPEG format
+   - Quality optimization (85-90%)
+   - File size reduction (typically 40-60%)
+2. **Image Upload** → AWS S3 (0.5-2 seconds, network-dependent, smaller files)
+3. **OCR Processing** → Google Document AI (3-8 seconds per receipt)
+4. **AI Enhancement** → OpenAI GPT-4 (2-5 seconds per receipt)
+5. **Data Validation** → Local processing (<1 second)
+6. **Human Review** → User verification via web UI
+
+**Total Processing Time:** ~7-19 seconds per receipt (excluding human review)  
+**Image Preprocessing Benefit:** Reduces S3 upload time and Document AI processing cost
+
+### Resource Profile
+
+#### **CPU Usage**
+- **Baseline:** Minimal (Flask request handling)
+- **Image Preprocessing:** Medium-High (ImageMagick resize/convert operations)
+- **Processing:** Medium (base64 encoding, JSON parsing, async coordination)
+- **Peak:** During concurrent receipt processing (multiple preprocessing + API calls)
+- **Typical Load:** 30-50% CPU with 10 concurrent receipts (up from 20-30% without preprocessing)
+
+#### **Memory Usage**
+- **Application:** ~150-300MB (Flask + dependencies)
+- **Image Preprocessing:** ~30-80MB per concurrent receipt (ImageMagick operations)
+  - Original image load: ~10-20MB
+  - Resized image buffer: ~10-30MB
+  - Temporary working memory: ~10-30MB
+- **Base64 Encoding:** ~10-20MB per receipt
+- **Database Connections:** ~5-10MB per connection pool
+- **Total per Concurrent Receipt:** ~70-120MB (increased from 50-80MB)
+
+#### **Network I/O**
+- **Upload:** 200KB-2MB per receipt (to S3, reduced after preprocessing)
+  - Original: 500KB-5MB → Optimized: 200KB-2MB (60-70% reduction)
+- **Google Document AI:** ~200KB-2MB per request (smaller files = faster processing)
+- **OpenAI API:** ~10-50KB per request
+- **Database:** Low (lightweight queries, bulk inserts)
+
+#### **Storage Requirements**
+- **S3:** ~800KB-1.5MB per receipt average (optimized images, down from 2-3MB)
+- **Database:** ~2-5KB per receipt record (structured data)
+- **Temp Storage:** ~50-100MB for concurrent image preprocessing operations
+- **Logs:** ~100MB per day at moderate load
+
+### Scalability Characteristics
+
+- **Concurrent Users:** Mixed workload (CPU for preprocessing + I/O for external APIs)
+- **Primary Bottleneck:** External API response times (Google Document AI & OpenAI)
+- **Secondary Bottleneck:** Image preprocessing CPU load (resize/convert operations)
+- **Concurrency Model:** Async/await for parallel API calls
+- **Session State:** In-memory (limits horizontal scaling without Redis)
+- **Processing Capacity:** ~10-15 concurrent receipts on 2 vCPU, ~30-40 on 4 vCPU
+
+### Security Features
+
+- 🔐 Passwordless authentication (magic links)
+- 🔒 Organization-level data isolation
+- 🎫 Single-use tokens with 15-minute expiration
+- 👤 Role-based access (admin, manager, user)
+- 🔑 Secure session management with HTTP-only cookies
+
 ## Features
 
 - 🔐 **Magic Link Authentication** - Passwordless login via email
@@ -115,9 +232,10 @@ Scouter is a standalone receipt processing system with magic link authentication
 - 🏥 **Health Monitoring** - Beautiful health check dashboard (admin only)
 - 📄 **Enhanced Receipt Processing** - Real-time processing pipeline with visual progress
 - ☁️ **S3 Integration** - Secure cloud storage for receipt images
-- 🔍 **Tesseract OCR** - Advanced text extraction from receipt images
+- 🔍 **OCR Technology** - Advanced text extraction from receipt images
 - 🤖 **OpenAI Integration** - AI-powered data structuring with confidence scoring
 - 📊 **Real-time Progress** - Live updates with Alpine.js-powered flow visualization
+- 📈 **Prometheus Metrics** - Built-in performance monitoring and cost tracking
 
 ## Quick Start
 
@@ -859,11 +977,40 @@ scouter/
 └── README.md                  # This documentation
 ```
 
-## Performance Monitoring with Prometheus & Grafana
+## Performance Monitoring
 
 Scouter includes built-in Prometheus metrics for monitoring receipt processing performance, costs, and quality.
 
-### 📊 Available Metrics
+### 🚀 Quick Start
+
+```bash
+# 1. Start monitoring with Docker
+docker compose up -d
+
+# 2. Create dashboards automatically
+python setup_grafana_dashboards.py
+
+# 3. Start Scouter (also starts monitoring)
+./start.sh
+```
+
+**Access:**
+- 📊 **Grafana Dashboard:** http://localhost:3000 (admin/admin)
+- 📈 **Prometheus:** http://localhost:9090
+- 🔌 **Metrics API:** http://localhost:5001/metrics
+
+### 📖 Full Documentation
+
+See **[MONITORING.md](MONITORING.md)** for complete details on:
+- Available metrics reference
+- Sample queries and dashboards  
+- Troubleshooting guide
+- Alerting setup
+- Production deployment
+
+**Performance Analysis:** [PERFORMANCE_ANALYSIS.md](PERFORMANCE_ANALYSIS.md) - Identify bottlenecks and optimize processing times
+
+### 📊 Key Metrics
 
 #### **Overall Pipeline Metrics**
 - `receipt_processing_duration_seconds` - Total end-to-end processing time (histogram)
@@ -884,229 +1031,13 @@ Scouter includes built-in Prometheus metrics for monitoring receipt processing p
 
 #### **Additional Metrics**
 - `receipt_upload_size_bytes` - Receipt image sizes (histogram)
-- `receipt_verification_duration_seconds` - User verification time (histogram)
 
-### 🚀 Quick Start with Prometheus
+#### **Service Error Tracking**
+- `s3_upload_errors_total{error_code, error_type}` - S3 failures (403/AccessDenied, 404/NoSuchBucket, 503/ServiceUnavailable)
+- `document_ai_errors_total{error_code, error_type}` - Document AI failures (400/InvalidArgument, 403/PermissionDenied, 429/ResourceExhausted, 500/Internal, 503/Unavailable)
+- `openai_errors_total{error_code, error_type}` - OpenAI failures (400/BadRequest, 401/Unauthorized, 429/RateLimitExceeded, 500/InternalError, 503/ServiceUnavailable)
 
-**1. Install Prometheus:**
-```bash
-# macOS
-brew install prometheus
-
-# Linux
-wget https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz
-tar xvfz prometheus-*.tar.gz
-cd prometheus-*
-```
-
-**2. Create Prometheus Configuration:**
-```bash
-cat > prometheus.yml <<EOF
-global:
-  scrape_interval: 15s
-
-scrape_configs:
-  - job_name: 'scouter'
-    static_configs:
-      - targets: ['localhost:5001']
-    metrics_path: '/metrics'
-EOF
-```
-
-**3. Start Prometheus:**
-```bash
-prometheus --config.file=prometheus.yml
-```
-
-**4. Access Prometheus UI:**
-```
-http://localhost:9090
-```
-
-### 📈 Quick Start with Grafana
-
-**1. Install Grafana:**
-```bash
-# macOS
-brew install grafana
-brew services start grafana
-
-# Linux
-sudo apt-get install -y grafana
-sudo systemctl start grafana-server
-```
-
-**2. Access Grafana:**
-```
-http://localhost:3000
-Default credentials: admin/admin
-```
-
-**3. Add Prometheus Data Source:**
-- Click "Configuration" → "Data Sources" → "Add data source"
-- Select "Prometheus"
-- URL: `http://localhost:9090`
-- Click "Save & Test"
-
-**4. Create Dashboard:**
-
-Use these sample queries:
-
-**Processing Time (P95):**
-```promql
-histogram_quantile(0.95, rate(receipt_processing_duration_seconds_bucket[5m]))
-```
-
-**Success Rate:**
-```promql
-rate(receipt_processing_success_total[5m]) / (rate(receipt_processing_success_total[5m]) + rate(receipt_processing_failed_total[5m]))
-```
-
-**Throughput (receipts/minute):**
-```promql
-rate(receipt_processing_success_total[1m]) * 60
-```
-
-**Step Duration Breakdown:**
-```promql
-sum by (step) (rate(receipt_step_duration_seconds_sum[5m])) / sum by (step) (rate(receipt_step_duration_seconds_count[5m]))
-```
-
-**AI Cost per Hour:**
-```promql
-rate(receipt_ai_cost_estimate_usd[1h])
-```
-
-**Average Confidence Score:**
-```promql
-avg(receipt_confidence_score)
-```
-
-**Concurrent Processing:**
-```promql
-receipt_processing_in_progress
-```
-
-### 📊 Sample Grafana Dashboard JSON
-
-Create a new dashboard and import this configuration:
-
-```json
-{
-  "dashboard": {
-    "title": "Scouter Receipt Processing",
-    "panels": [
-      {
-        "title": "Processing Duration (P50, P95, P99)",
-        "targets": [{
-          "expr": "histogram_quantile(0.50, rate(receipt_processing_duration_seconds_bucket[5m]))",
-          "legendFormat": "P50"
-        }]
-      },
-      {
-        "title": "Success vs Failed Receipts",
-        "targets": [{
-          "expr": "rate(receipt_processing_success_total[5m])",
-          "legendFormat": "Success"
-        }, {
-          "expr": "rate(receipt_processing_failed_total[5m])",
-          "legendFormat": "Failed"
-        }]
-      },
-      {
-        "title": "Step Duration Breakdown",
-        "targets": [{
-          "expr": "rate(receipt_step_duration_seconds_sum[5m]) / rate(receipt_step_duration_seconds_count[5m])",
-          "legendFormat": "{{step}}"
-        }]
-      }
-    ]
-  }
-}
-```
-
-### 🔍 Useful Prometheus Queries
-
-**Find Slowest Step:**
-```promql
-topk(1, sum by (step) (rate(receipt_step_duration_seconds_sum[5m])) / sum by (step) (rate(receipt_step_duration_seconds_count[5m])))
-```
-
-**Failure Rate by Step:**
-```promql
-sum by (step) (rate(receipt_processing_failed_total[5m]))
-```
-
-**Daily Token Usage:**
-```promql
-increase(receipt_ai_tokens_used_total[24h])
-```
-
-**Low Confidence Rate:**
-```promql
-rate(receipt_human_review_required_total[1h]) / rate(receipt_processing_success_total[1h])
-```
-
-### 🎯 Recommended Alerts
-
-Create these alerts in Prometheus `rules.yml`:
-
-```yaml
-groups:
-  - name: scouter_alerts
-    rules:
-      - alert: HighFailureRate
-        expr: rate(receipt_processing_failed_total[5m]) > 0.1
-        for: 5m
-        annotations:
-          summary: "High receipt processing failure rate"
-          
-      - alert: SlowProcessing
-        expr: histogram_quantile(0.95, rate(receipt_processing_duration_seconds_bucket[5m])) > 60
-        for: 10m
-        annotations:
-          summary: "Receipt processing is taking > 60 seconds (P95)"
-          
-      - alert: HighAICost
-        expr: rate(receipt_ai_cost_estimate_usd[1h]) > 10
-        for: 1h
-        annotations:
-          summary: "AI costs exceeding $10/hour"
-```
-
-### 📝 Testing Metrics
-
-**1. View Raw Metrics:**
-```bash
-curl http://localhost:5001/metrics
-```
-
-**2. Process a Test Receipt:**
-- Upload a receipt through the UI
-- Check metrics update in real-time
-
-**3. Query Metrics in Prometheus:**
-- Go to `http://localhost:9090/graph`
-- Enter metric name (e.g., `receipt_processing_duration_seconds`)
-- Click "Execute" and "Graph"
-
-### 🎨 Grafana Dashboard Tips
-
-1. **Create Rows** for different metric categories:
-   - Performance (duration, throughput)
-   - Quality (confidence, human review rate)
-   - Costs (tokens, API costs)
-   - System Health (errors, concurrent processing)
-
-2. **Use Variables** for dynamic filtering:
-   - Step name (upload, ocr, ai, validation)
-   - Time range
-   - Percentile (P50, P95, P99)
-
-3. **Set Up Alerts** in Grafana:
-   - Notification channels (Slack, email, PagerDuty)
-   - Alert rules based on thresholds
-   - Alert history and acknowledgment
+---
 
 ## Troubleshooting
 

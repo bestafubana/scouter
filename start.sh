@@ -33,71 +33,57 @@ else
     echo "   Emails will not be captured during development"
 fi
 
-# Start Prometheus for metrics (optional)
+# Start Monitoring Stack (Prometheus + Grafana)
 echo ""
-echo "📊 Starting Prometheus for metrics..."
-if command -v prometheus >/dev/null 2>&1; then
-    # Check if Prometheus is already running
+echo "📊 Starting Monitoring Stack..."
+
+# Check for Docker first (preferred method)
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    # Docker is available and running
+    if docker ps | grep -q "scouter-prometheus\|scouter-grafana"; then
+        echo "✅ Monitoring stack already running in Docker"
+    else
+        echo "🐳 Starting Prometheus + Grafana with Docker..."
+        if docker compose up -d 2>/dev/null; then
+            sleep 3
+            echo "✅ Monitoring stack started successfully"
+            echo "📈 Prometheus: http://localhost:9090"
+            echo "📊 Grafana: http://localhost:3000 (admin/admin)"
+        else
+            echo "⚠️  Failed to start monitoring with Docker (non-critical)"
+            echo "   Run: docker compose up -d"
+        fi
+    fi
+elif command -v prometheus >/dev/null 2>&1; then
+    # Fallback to native Prometheus
+    echo "🔧 Using native Prometheus installation..."
     if ! pgrep -f "prometheus" > /dev/null; then
-        # Check if prometheus.yml exists
         if [ -f "prometheus.yml" ]; then
             prometheus --config.file=prometheus.yml --web.listen-address=":9090" > prometheus.log 2>&1 &
             sleep 2
-            echo "✅ Prometheus started successfully"
-            echo "📈 Prometheus UI: http://localhost:9090"
-            echo "📊 Metrics endpoint: http://localhost:5001/metrics"
-        else
-            echo "⚠️  prometheus.yml not found. Creating default config..."
-            cat > prometheus.yml <<'EOF'
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-scrape_configs:
-  - job_name: 'scouter'
-    static_configs:
-      - targets: ['localhost:5001']
-    metrics_path: '/metrics'
-    scrape_interval: 5s
-EOF
-            prometheus --config.file=prometheus.yml --web.listen-address=":9090" > prometheus.log 2>&1 &
-            sleep 2
-            echo "✅ Prometheus started with default config"
+            echo "✅ Prometheus started"
             echo "📈 Prometheus UI: http://localhost:9090"
         fi
     else
-        echo "✅ Prometheus is already running"
+        echo "✅ Prometheus already running"
+    fi
+    
+    # Try Grafana
+    if command -v grafana-server >/dev/null 2>&1; then
+        if ! pgrep -f "grafana-server" > /dev/null; then
+            if command -v brew >/dev/null 2>&1; then
+                brew services start grafana >/dev/null 2>&1
+                echo "✅ Grafana started"
+            fi
+        else
+            echo "✅ Grafana already running"
+        fi
     fi
 else
-    echo "⚠️  Prometheus not found. Install with: brew install prometheus"
+    echo "⚠️  No monitoring tools found (non-critical)"
+    echo "   Install Docker: https://docs.docker.com/desktop/install/mac-install/"
+    echo "   Or run: ./start-monitoring.sh"
     echo "   Metrics will still be available at /metrics endpoint"
-fi
-
-# Start Grafana for dashboards (optional)
-echo ""
-echo "📈 Starting Grafana for dashboards..."
-if command -v grafana-server >/dev/null 2>&1; then
-    # Check if Grafana is already running
-    if ! pgrep -f "grafana-server" > /dev/null; then
-        # macOS: Use brew services if available
-        if command -v brew >/dev/null 2>&1; then
-            brew services start grafana >/dev/null 2>&1
-            sleep 2
-            echo "✅ Grafana started successfully"
-            echo "📊 Grafana UI: http://localhost:3000 (admin/admin)"
-        else
-            # Linux: Start directly
-            grafana-server --homepath=/usr/share/grafana > grafana.log 2>&1 &
-            sleep 2
-            echo "✅ Grafana started successfully"
-            echo "📊 Grafana UI: http://localhost:3000 (admin/admin)"
-        fi
-    else
-        echo "✅ Grafana is already running"
-    fi
-else
-    echo "⚠️  Grafana not found. Install with: brew install grafana"
-    echo "   You can still use Prometheus to query metrics"
 fi
 
 # Function to kill processes on a port more aggressively
@@ -144,11 +130,10 @@ echo "💡 Magic links will appear in this terminal (development mode)"
 echo ""
 echo "🔗 Quick Links:"
 echo "   • Scouter App: http://localhost:$PORT/index.html"
+echo "   • Metrics API: http://localhost:$PORT/metrics"
 echo "   • MailHog: http://localhost:8025"
-if command -v prometheus >/dev/null 2>&1 && pgrep -f "prometheus" > /dev/null; then
+if docker ps 2>/dev/null | grep -q "scouter-prometheus\|scouter-grafana" || pgrep -f "prometheus\|grafana-server" > /dev/null 2>&1; then
     echo "   • Prometheus: http://localhost:9090"
-fi
-if command -v grafana-server >/dev/null 2>&1 && pgrep -f "grafana-server" > /dev/null; then
     echo "   • Grafana: http://localhost:3000"
 fi
 echo ""

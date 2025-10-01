@@ -91,6 +91,34 @@ receipt_verification_duration = Histogram(
 )
 
 # ============================================================================
+# Service-Specific Error Metrics
+# ============================================================================
+
+# S3 Upload Errors
+# Common error codes: 403 (AccessDenied), 404 (NoSuchBucket), 503 (ServiceUnavailable)
+s3_upload_errors_total = Counter(
+    's3_upload_errors_total',
+    'S3 upload failures by error code',
+    ['error_code', 'error_type']  # e.g., error_code='403', error_type='AccessDenied'
+)
+
+# Google Document AI Errors  
+# Common error codes: 400 (InvalidArgument), 403 (PermissionDenied), 429 (ResourceExhausted), 500 (Internal), 503 (Unavailable)
+document_ai_errors_total = Counter(
+    'document_ai_errors_total',
+    'Google Document AI failures by error code',
+    ['error_code', 'error_type']  # e.g., error_code='429', error_type='RESOURCE_EXHAUSTED'
+)
+
+# OpenAI API Errors
+# Common error codes: 400 (BadRequest), 401 (Unauthorized), 429 (RateLimitExceeded), 500 (InternalError), 503 (ServiceUnavailable)
+openai_errors_total = Counter(
+    'openai_errors_total',
+    'OpenAI API failures by error code',
+    ['error_code', 'error_type']  # e.g., error_code='429', error_type='rate_limit_exceeded'
+)
+
+# ============================================================================
 # Helper Functions
 # ============================================================================
 
