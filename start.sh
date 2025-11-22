@@ -33,93 +33,31 @@ else
     echo "   Emails will not be captured during development"
 fi
 
-# Start Monitoring Stack (Prometheus + Grafana)
+# Skip monitoring startup for now (Docker is causing hangs)
+# Metrics will still be available at /metrics endpoint
 echo ""
-echo "📊 Starting Monitoring Stack..."
+echo "📊 Monitoring: Skipped (start manually with: docker compose up -d)"
+echo ""
 
-# Check for Docker first (preferred method)
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    # Docker is available and running
-    if docker ps | grep -q "scouter-prometheus\|scouter-grafana"; then
-        echo "✅ Monitoring stack already running in Docker"
-    else
-        echo "🐳 Starting Prometheus + Grafana with Docker..."
-        if docker compose up -d 2>/dev/null; then
-            sleep 3
-            echo "✅ Monitoring stack started successfully"
-            echo "📈 Prometheus: http://localhost:9090"
-            echo "📊 Grafana: http://localhost:3000 (admin/admin)"
-        else
-            echo "⚠️  Failed to start monitoring with Docker (non-critical)"
-            echo "   Run: docker compose up -d"
-        fi
-    fi
-elif command -v prometheus >/dev/null 2>&1; then
-    # Fallback to native Prometheus
-    echo "🔧 Using native Prometheus installation..."
-    if ! pgrep -f "prometheus" > /dev/null; then
-        if [ -f "prometheus.yml" ]; then
-            prometheus --config.file=prometheus.yml --web.listen-address=":9090" > prometheus.log 2>&1 &
-            sleep 2
-            echo "✅ Prometheus started"
-            echo "📈 Prometheus UI: http://localhost:9090"
-        fi
-    else
-        echo "✅ Prometheus already running"
-    fi
-    
-    # Try Grafana
-    if command -v grafana-server >/dev/null 2>&1; then
-        if ! pgrep -f "grafana-server" > /dev/null; then
-            if command -v brew >/dev/null 2>&1; then
-                brew services start grafana >/dev/null 2>&1
-                echo "✅ Grafana started"
-            fi
-        else
-            echo "✅ Grafana already running"
-        fi
-    fi
-else
-    echo "⚠️  No monitoring tools found (non-critical)"
-    echo "   Install Docker: https://docs.docker.com/desktop/install/mac-install/"
-    echo "   Or run: ./start-monitoring.sh"
-    echo "   Metrics will still be available at /metrics endpoint"
-fi
+# FOOLPROOF PORT CLEANUP - Kill everything on 5000 and 5001
+echo "🧹 Cleaning up ports 5000 and 5001..."
 
-# Function to kill processes on a port more aggressively
-kdill_port_processes() {
-    local port=$1
-    echo "🔍 Checking for existing processes on port $port..."
-    
-    # Try multiple methods to find and kill processes
-    PIDS=$(lsof -ti:$port 2>/dev/null)
-    if [ ! -z "$PIDS" ]; then
-        echo "⚡ Killing processes on port $port: $PIDS"
-        echo $PIDS | xargs kill -9 2>/dev/null
-        sleep 2
-    fi
-    
-    # Double-check with netstat as backup
-    NETSTAT_PIDS=$(netstat -tulpn 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d/ -f1 | grep -v -)
-    if [ ! -z "$NETSTAT_PIDS" ]; then
-        echo "⚡ Found additional processes via netstat: $NETSTAT_PIDS"
-        echo $NETSTAT_PIDS | xargs kill -9 2>/dev/null
-        sleep 1
-    fi
-}
+# Kill port 5000
+lsof -ti:5000 2>/dev/null | xargs kill -9 2>/dev/null
+# Kill port 5001  
+lsof -ti:5001 2>/dev/null | xargs kill -9 2>/dev/null
 
-# Try to clean up port 5000
-kill_port_processes 5000
+# Kill any existing Flask/Python processes running auth_server.py
+pkill -9 -f "python.*auth_server.py" 2>/dev/null
+pkill -9 -f "flask.*run" 2>/dev/null
 
-# Check if port 5000 is still in use
-if lsof -i:5000 >/dev/null 2>&1; then
-    echo "⚠️  Port 5000 is still in use (possibly by system service like AirPlay)"
-    echo "🔄 Switching to port 5001..."
-    PORT=5001
-    kill_port_processes 5001
-else
-    PORT=5000
-fi
+# Wait for ports to be released
+sleep 3
+
+echo "✅ Ports cleaned up"
+
+# Always use port 5001 (5000 often conflicts with macOS AirPlay)
+PORT=5001
 
 # Start the authentication server
 echo ""
@@ -132,19 +70,33 @@ echo "🔗 Quick Links:"
 echo "   • Scouter App: http://localhost:$PORT/index.html"
 echo "   • Metrics API: http://localhost:$PORT/metrics"
 echo "   • MailHog: http://localhost:8025"
-if docker ps 2>/dev/null | grep -q "scouter-prometheus\|scouter-grafana" || pgrep -f "prometheus\|grafana-server" > /dev/null 2>&1; then
-    echo "   • Prometheus: http://localhost:9090"
-    echo "   • Grafana: http://localhost:3000"
-fi
-echo ""
-echo "🛑 Press Ctrl+C to stop all services"
 echo ""
 
-# Set the port as an environment variable and start the server
+# Set the port as an environment variable and start the server in background
 export FLASK_PORT=$PORT
-python -c "
+nohup python -c "
 import os
 from auth_server import app
 port = int(os.environ.get('FLASK_PORT', 5000))
 app.run(host='0.0.0.0', port=port, debug=True)
-" 
+" > flask.log 2>&1 &
+
+# Wait for server to start
+sleep 3
+
+# Check if server actually started
+if lsof -i:$PORT >/dev/null 2>&1; then
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "✅ Scouter is running!"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "📋 View logs: tail -f flask.log"
+    echo "🛑 Stop server: pkill -f auth_server.py"
+    echo ""
+else
+    echo ""
+    echo "❌ Server failed to start. Check flask.log for errors:"
+    echo "   tail flask.log"
+    exit 1
+fi
